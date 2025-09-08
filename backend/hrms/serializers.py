@@ -3,9 +3,10 @@ from django.contrib.auth.models import User
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        fields = ['id', 'username', 'first_name', 'last_name', 'email', 'password']
 
 class DepartmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,21 +15,25 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 class PositionSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
-    
     class Meta:
         model = Position
         fields = '__all__'
 
 class EmployeeSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
+    user = UserSerializer()
     department_name = serializers.CharField(source='department.name', read_only=True)
     position_title = serializers.CharField(source='position.title', read_only=True)
     manager_name = serializers.SerializerMethodField()
-    
     class Meta:
         model = Employee
         fields = '__all__'
-    
+
+    def create(self, validated_data):
+        user_data = validated_data.pop('user')
+        user = User.objects.create_user(**user_data)
+        employee = Employee.objects.create(user=user, **validated_data)
+        return employee
+
     def get_manager_name(self, obj):
         if obj.manager:
             return f"{obj.manager.user.first_name} {obj.manager.user.last_name}"

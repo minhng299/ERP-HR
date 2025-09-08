@@ -40,6 +40,11 @@ class Employee(models.Model):
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=EMPLOYMENT_STATUS, default='active')
     profile_picture = models.URLField(blank=True)
+    ROLE_CHOICES = [
+        ('manager', 'Manager'),
+        ('employee', 'Employee'),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
     
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} ({self.employee_id})"

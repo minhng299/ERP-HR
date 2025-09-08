@@ -1,8 +1,26 @@
+import { useState, useEffect } from 'react';
+import { Plus, Eye, Edit } from 'lucide-react';
+import { hrapi, login, getToken } from '../services/api.jwt';
+ 
 const PerformanceManagement = () => {
   const [performances, setPerformances] = useState([]);
   
   useEffect(() => {
-    api.getPerformances().then(setPerformances);
+    const fetchData = async () => {
+      // Check for token and login if needed
+      let token = getToken();
+      if (!token) {
+        // Perform login logic here, e.g., redirect to login page or show login form
+        await login();
+        token = getToken(); // Get the new token after login
+      }
+      
+      // Fetch performances data
+      hrapi.getPerformances()
+        .then(response => setPerformances(response.data));
+    };
+    
+    fetchData();
   }, []);
   
   const getRatingColor = (rating) => {
@@ -110,3 +128,5 @@ const PerformanceManagement = () => {
     </div>
   );
 };
+
+export default PerformanceManagement;

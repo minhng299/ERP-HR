@@ -1,9 +1,27 @@
+import React, { useEffect, useState } from 'react';
+import { Plus } from 'lucide-react';
+import { hrapi, login, getToken } from '../services/api.jwt';
+
 const AttendanceManagement = () => {
   const [attendance, setAttendance] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
   useEffect(() => {
-    api.getAttendance().then(setAttendance);
+    const fetchData = async () => {
+      // Check for token and login if needed
+      let token = getToken();
+      if (!token) {
+        // Perform login action, you might want to replace this with your actual login logic
+        const response = await login({ username: 'your_username', password: 'your_password' });
+        token = response.token;
+      }
+      
+      // Now that we have the token, fetch the attendance data
+      hrapi.getAttendance(token)
+        .then(response => setAttendance(response.data));
+    };
+    
+    fetchData();
   }, []);
   
   return (
@@ -90,3 +108,5 @@ const AttendanceManagement = () => {
     </div>
   );
 };
+
+export default AttendanceManagement;

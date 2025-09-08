@@ -10,6 +10,7 @@ from .serializers import (
     AttendanceSerializer, LeaveRequestSerializer, LeaveTypeSerializer,
     PerformanceSerializer
 )
+from .permissions import IsManager, IsEmployee
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
@@ -22,6 +23,14 @@ class PositionViewSet(viewsets.ModelViewSet):
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.select_related('user', 'department', 'position', 'manager').all()
     serializer_class = EmployeeSerializer
+    permission_classes = [IsManager]
+    
+    
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        employee = Employee.objects.get(user=request.user)
+        serializer = self.get_serializer(employee)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
     def dashboard_stats(self, request):
@@ -63,6 +72,11 @@ class LeaveTypeViewSet(viewsets.ModelViewSet):
 class LeaveRequestViewSet(viewsets.ModelViewSet):
     queryset = LeaveRequest.objects.select_related('employee__user', 'leave_type', 'approved_by__user').all()
     serializer_class = LeaveRequestSerializer
+    
+    def get_permissions(self):
+        if self.action == 'create':
+            return [IsEmployee()]
+        return super().get_permissions()
     
     @action(detail=True, methods=['post'])
     def approve(self, request, pk=None):

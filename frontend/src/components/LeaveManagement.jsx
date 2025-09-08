@@ -1,9 +1,25 @@
+import { useState, useEffect } from 'react';
+import { Plus, CheckCircle, XCircle, Eye } from 'lucide-react';
+import { hrapi, login, getToken } from '../services/api.jwt';
+
 const LeaveManagement = () => {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
   
   useEffect(() => {
-    api.getLeaveRequests().then(setLeaveRequests);
+    const fetchData = async () => {
+      let token = getToken();
+      if (!token) {
+        // Perform login if no token is found
+        const loginResponse = await login('your-username', 'your-password');
+        token = loginResponse.token;
+      }
+      // Now that we have a token, we can fetch leave requests
+      hrapi.getLeaveRequests(token)
+        .then(response => setLeaveRequests(response.data));
+    };
+    
+    fetchData();
   }, []);
   
   const filteredRequests = leaveRequests.filter(request => 
@@ -130,3 +146,5 @@ const LeaveManagement = () => {
     </div>
   );
 };
+
+export default LeaveManagement;
