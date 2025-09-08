@@ -14,14 +14,14 @@ class PositionAdmin(admin.ModelAdmin):
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
-    list_display = ['employee_id', 'user', 'department', 'position', 'hire_date', 'status']
+    list_display = ['employee_id', 'user', 'department', 'position', 'role', 'status']
     list_filter = ['department', 'position', 'status']
     search_fields = ['employee_id', 'user__first_name', 'user__last_name']
 
 @admin.register(Attendance)
 class AttendanceAdmin(admin.ModelAdmin):
     list_display = ['employee', 'date', 'check_in', 'check_out', 'total_hours']
-    list_filter = ['date', 'employee__department']
+    list_filter = ['date', 'employee__department']      
     date_hierarchy = 'date'
 
 @admin.register(LeaveType)

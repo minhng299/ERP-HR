@@ -9,16 +9,6 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchStats = async () => {
-      if (!getToken()) {
-        // For demo: hardcoded credentials, replace with login form in production
-        try {
-          await login('admin', 'admin123');
-        } catch (err) {
-          setAuthError(true);
-          setLoading(false);
-          return;
-        }
-      }
       hrapi.getDashboardStats()
       .then(res => {
         setStats(res.data); 

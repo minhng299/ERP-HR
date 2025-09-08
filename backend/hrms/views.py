@@ -23,9 +23,15 @@ class PositionViewSet(viewsets.ModelViewSet):
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.select_related('user', 'department', 'position', 'manager').all()
     serializer_class = EmployeeSerializer
-    permission_classes = [IsManager]
-    
-    
+    # permission_classes = [IsManager]
+
+    def get_permissions(self):
+        # Allow any authenticated user to access 'me' endpoint
+        if self.action == 'me':
+            from rest_framework.permissions import IsAuthenticated
+            return [IsAuthenticated()]
+        return super().get_permissions()
+
     @action(detail=False, methods=['get'])
     def me(self, request):
         employee = Employee.objects.get(user=request.user)

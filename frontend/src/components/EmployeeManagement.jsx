@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
 import { hrapi, login, getToken } from '../services/api.jwt';
-
+import { useAuth } from '../contexts/AuthContext';
 const EmployeeManagement = () => {
+  const { user } = useAuth();
+  console.log("user",user.role)
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -131,10 +133,13 @@ const EmployeeManagement = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Employee Management</h1>
-        <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2" onClick={() => setShowModal(true)}>
-          <Plus className="h-4 w-4" />
-          <span>Add Employee</span>
-        </button>
+
+        {user.role === 'manager' && (
+          <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2" onClick={() => setShowModal(true)}>
+            <Plus className="h-4 w-4" />
+            <span>Add Employee</span>
+          </button>
+        )}
       </div>
 
       {/* Add Employee Modal */}
