@@ -82,7 +82,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'erp_hr_db',
         'USER': 'root',
-        'PASSWORD': 'abcd1234',
+        'PASSWORD': '123456',
         'HOST': 'localhost',
         'PORT': '3306',
     }
