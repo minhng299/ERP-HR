@@ -54,6 +54,24 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         model = LeaveType
         fields = '__all__'
 
+# class LeaveRequestSerializer(serializers.ModelSerializer):
+#     employee_name = serializers.SerializerMethodField()
+#     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
+#     approved_by_name = serializers.SerializerMethodField()
+    
+#     class Meta:
+#         model = LeaveRequest
+#         fields = '__all__'
+    
+#     def get_employee_name(self, obj):
+#         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
+    
+#     def get_approved_by_name(self, obj):
+#         if obj.approved_by:
+#             return f"{obj.approved_by.user.first_name} {obj.approved_by.user.last_name}"
+#         return None
+# 
+# tranh ngay am
 class LeaveRequestSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
@@ -62,6 +80,11 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveRequest
         fields = '__all__'
+    
+    def validate(self, data):
+        if data['end_date'] < data['start_date']:
+            raise serializers.ValidationError("End date must be after start date.")
+        return data
     
     def get_employee_name(self, obj):
         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
