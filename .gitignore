@@ -1,0 +1,14 @@
+.venv
+venv
+*.pyc
+dist
+.env
+/docker-compose.yml
+/demo
+docker.env
+/Dockerfile
+oidc.key
+debug.log
+.vscode
+serviceAccountKey.json
+/client-sites
