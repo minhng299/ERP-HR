@@ -15,15 +15,17 @@
     - Custom DRF permissions (`IsManager`, `IsEmployee`) restrict API access.
     - `/api/employees/me/` endpoint returns current user's employee profile and role.
 
-- **Frontend (React + Vite):**
-  - Components for Dashboard, Employee Management, Attendance, Leave, Performance, etc.
-  - JWT login flow with protected routes and redirect after login.
-  - Employee creation modal with all required fields, including user info, department/position selection, and validation.
-  - Fetches department and position lists from backend for dropdowns.
-  - All main features are manager/admin-oriented (CRUD, approval, stats).
-  - **Role-based access:**
-    - AuthContext fetches current user and role after login.
-    - PrivateRoute component restricts access to routes based on role.
+  - **Frontend (React + Vite):**
+    - Sidebar navigation uses React Router links for each main section (Dashboard, Employees, Attendance, Leave, Performance).
+    - Nested routing: All main content pages are routed via ERPHRSystem, allowing deep linking and browser navigation.
+    - Employee detail page accessible via `/employees/:id`, only editable by managers.
+    - JWT login flow with protected routes and redirect after login.
+    - Employee creation modal with all required fields, including user info, department/position selection, and validation.
+    - Fetches department and position lists from backend for dropdowns.
+    - All main features are manager/admin-oriented (CRUD, approval, stats).
+    - **Role-based access:**
+      - AuthContext fetches current user and role after login.
+      - PrivateRoute component restricts access to routes based on role.
 
 ## Login Flow
 
@@ -36,25 +38,26 @@
 
 ## What To Do Next
 
-- **Role-Based UI:**
-  - Add employee self-service features (view own info, request leave, view attendance).
-  - Further restrict/enable features in frontend based on role.
+  - **Role-Based UI:**
+    - Add employee self-service features (view own info, request leave, view attendance).
+    - Further restrict/enable features in frontend based on role.
 
-- **Leave Request Improvements:**
-  - Allow employees to create leave requests from frontend.
-  - Add manager selection for approval workflow.
+  - **Leave Request Improvements:**
+    - Allow employees to create leave requests from frontend.
+    - Add manager selection for approval workflow.
 
-- **UI/UX Enhancements:**
-  - Improve error handling and validation in forms.
-  - Add notifications for actions (success, error, approval).
-  - Enhance dashboard with more analytics and charts.
+  - **UI/UX Enhancements:**
+    - Improve error handling and validation in forms.
+    - Add notifications for actions (success, error, approval).
+    - Enhance dashboard with more analytics and charts.
+    - Improve navigation and route protection for all pages.
 
-- **Testing & Security:**
-  - Add unit and integration tests for backend and frontend.
-  - Harden authentication and permissions (e.g., password rules, API rate limiting).
+  - **Testing & Security:**
+    - Add unit and integration tests for backend and frontend.
+    - Harden authentication and permissions (e.g., password rules, API rate limiting).
 
-- **Deployment:**
-  - Prepare for production deployment (env config, static files, HTTPS, etc.).
+  - **Deployment:**
+    - Prepare for production deployment (env config, static files, HTTPS, etc.).
 
 ---
 
