@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
-
+# thường dùng trong Django REST Framework, định nghĩa các lớp Serializer (biến model → JSON và ngược lại).
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
     class Meta:

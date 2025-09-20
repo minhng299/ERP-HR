@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
+from django.utils.timezone import now
+
 
 class Department(models.Model):
     name = models.CharField(max_length=100)
@@ -48,6 +50,15 @@ class Employee(models.Model):
     
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} ({self.employee_id})"
+    # tự động tính tổng số ngày nghỉ được approve trong năm hiện tại
+    def leave_days_used(self):
+        current_year = now().year
+        return LeaveRequest.objects.filter(
+            employee=self,
+            status='approved',
+            start_date__year=current_year
+        ).aggregate(total=models.Sum('days_requested'))['total'] or 0
+
 
 class Attendance(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)

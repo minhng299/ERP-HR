@@ -10,6 +10,7 @@ from .serializers import (
     AttendanceSerializer, LeaveRequestSerializer, LeaveTypeSerializer,
     PerformanceSerializer
 )
+# nơi viết logic xử lý request → response (trả về HTML hoặc JSON API).
 from .permissions import IsManager, IsEmployee
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -58,6 +59,15 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             'departments': list(departments),
             'recent_hires': recent_hires,
             'pending_leaves': pending_leaves,
+        })
+    # tự động tinh tổng số ngày nghỉ được approve trong năm hiện tại
+
+# http://localhost:8000/api/employees/1/leave_summary    # @action(detail=True, methods=['get'])
+    def leave_summary(self, request, pk=None):
+        employee = self.get_object()
+        return Response({
+            "employee": str(employee),
+            "leave_days_used": employee.leave_days_used()
         })
 
 class AttendanceViewSet(viewsets.ModelViewSet):

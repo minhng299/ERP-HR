@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
-
+# ấu hình các model hiển thị trong Django Admin.
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
     list_display = ['name', 'description', 'created_at']
