@@ -1,27 +1,26 @@
 import React, { useState } from 'react';
 import { login } from '../services/api.jwt';
 import { useNavigate } from 'react-router-dom';
-
+import { useAuth } from '../contexts/AuthContext';
 const LoginForm = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  // const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
+  const { loading, setLoading, refreshUser } = useAuth();
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    // setLoading(true);
     setError('');
     try {
-    await login(username, password);
-    navigate('/dashboard'); // Redirect to dashboard
+      await login(username, password);
+      await refreshUser();
+      navigate('/dashboard'); // Redirect to dashboard
     } catch (err) {
       setError('Invalid credentials');
-    } finally {
-      setLoading(false);
     }
-  };
+  }
 
   return (
     <form onSubmit={handleSubmit} className="max-w-sm mx-auto mt-10 p-6 bg-white rounded shadow">
