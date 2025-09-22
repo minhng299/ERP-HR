@@ -26,7 +26,7 @@ class AttendanceAdmin(admin.ModelAdmin):
 
 @admin.register(LeaveType)
 class LeaveTypeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'days_allowed']
+    list_display = ['name', 'max_days_per_year', 'is_paid']
 
 @admin.register(LeaveRequest)
 class LeaveRequestAdmin(admin.ModelAdmin):

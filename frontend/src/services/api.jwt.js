@@ -38,6 +38,7 @@ export const login = async (username, password) => {
 };
 
 export const hrapi = {
+  
   // Dashboard
   getDashboardStats: () => api.get('/employees/dashboard_stats/'),
 

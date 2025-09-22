@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Plus, CheckCircle, XCircle, Eye } from 'lucide-react';
 import { hrapi, login, getToken } from '../services/api.jwt';
+import CreateLeaveRequest from '../components/CreateLeaveRequest';
 
 const LeaveManagement = () => {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [showForm, setShowForm] = useState(false);
+
   
   useEffect(() => {
     const fetchData = async () => {
@@ -42,7 +45,8 @@ const LeaveManagement = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Leave Management</h1>
-        <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+        <button onClick={() => setShowForm(true)}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
           <Plus className="h-4 w-4" />
           <span>New Request</span>
         </button>
@@ -143,6 +147,24 @@ const LeaveManagement = () => {
           </tbody>
         </table>
       </div>
+      {showForm && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+        <div className="bg-white p-6 rounded-lg w-full max-w-xl">
+          <CreateLeaveRequest
+            onSuccess={() => {
+              setShowForm(false);
+              // Reload danh sách nếu cần
+            }}
+          />
+          <button
+            onClick={() => setShowForm(false)}
+            className="mt-4 text-sm text-gray-500 hover:text-gray-700"
+          >
+            Đóng
+          </button>
+        </div>
+      </div>
+      )};
     </div>
   );
 };

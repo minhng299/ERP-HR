@@ -1,6 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.shortcuts import render
+from .models import LeaveType
 from django.db.models import Count, Avg
 from django.utils import timezone
 from datetime import timedelta
@@ -70,6 +72,7 @@ class LeaveTypeViewSet(viewsets.ModelViewSet):
     queryset = LeaveType.objects.all()
     serializer_class = LeaveTypeSerializer
     permission_classes = [IsAuthenticated, IsManagerOrReadOnly]
+
 
 class LeaveRequestViewSet(viewsets.ModelViewSet):
     queryset = LeaveRequest.objects.select_related('employee__user', 'leave_type', 'approved_by__user').all()
