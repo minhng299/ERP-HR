@@ -1,10 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Plus, Eye, Edit } from 'lucide-react';
 import { hrapi, login, getToken } from '../services/api.jwt';
- 
+import NewReviewModal from "../components/performance/NewReviewModal";
+import EditReviewModal from "../components/performance/EditReviewModal";
+import ViewReviewModal from "../components/performance/ViewReviewModal";
+
 const PerformanceManagement = () => {
   const [performances, setPerformances] = useState([]);
+
+  const [isNewModalOpen, setIsNewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   
+  const [selectedReview, setSelectedReview] = useState(null);
+
   useEffect(() => {
     const fetchData = async () => {
       // Check for token and login if needed
@@ -38,7 +47,10 @@ const PerformanceManagement = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Performance Management</h1>
-        <button className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+        <button 
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2" 
+          onClick={() => setIsNewModalOpen(true)}
+          >
           <Plus className="h-4 w-4" />
           <span>New Review</span>
         </button>
@@ -112,10 +124,22 @@ const PerformanceManagement = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
-                    <button className="text-blue-600 hover:text-blue-900">
+                    <button 
+                      className="text-blue-600 hover:text-blue-900"
+                      onClick={() => {
+                        setSelectedReview(performance);
+                        setIsViewModalOpen(true);
+                      }}
+                      >
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button className="text-green-600 hover:text-green-900">
+                    <button 
+                      className="text-green-600 hover:text-green-900"
+                      onClick={() => {
+                        setSelectedReview(performance);
+                        setIsEditModalOpen(true);
+                      }}
+                      >
                       <Edit className="h-4 w-4" />
                     </button>
                   </div>
@@ -125,6 +149,22 @@ const PerformanceManagement = () => {
           </tbody>
         </table>
       </div>
+      
+      {/* Modals */}
+      <NewReviewModal
+        isOpen={isNewModalOpen}
+        onClose={() => setIsNewModalOpen(false)}
+      />
+      <EditReviewModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        review={selectedReview}
+      />
+      <ViewReviewModal
+        isOpen={isViewModalOpen}
+        onClose={() => setIsViewModalOpen(false)}
+        review={selectedReview}
+      />
     </div>
   );
 };
