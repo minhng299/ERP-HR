@@ -14,8 +14,8 @@ const LoginForm = () => {
     setLoading(true);
     setError('');
     try {
-      await login(username, password);
-      navigate('/'); // Redirect to dashboard
+    await login(username, password);
+    navigate('/dashboard'); // Redirect to dashboard
     } catch (err) {
       setError('Invalid credentials');
     } finally {
