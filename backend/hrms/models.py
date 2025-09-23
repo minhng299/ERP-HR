@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
+
 
 class Department(models.Model):
     name = models.CharField(max_length=100)
@@ -110,8 +112,8 @@ class Performance(models.Model):
         (4, 'Above Average'),
         (5, 'Excellent'),
     ]
-    
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
+
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='performance_reviews')
     reviewer = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='reviewed_performances')
     review_period_start = models.DateField()
     review_period_end = models.DateField()
@@ -123,3 +125,59 @@ class Performance(models.Model):
     comments = models.TextField()
     employee_comments = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('finalized', 'Finalized'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['employee', 'review_period_start', 'review_period_end'],
+                name='unique_employee_review_period'
+            )
+        ]
+
+    def __str__(self):
+        return (f"Performance Review: {self.employee.user.first_name} {self.employee.user.last_name} "
+                f"by {self.reviewer.user.first_name} {self.reviewer.user.last_name} "
+                f"({self.review_period_start} - {self.review_period_end}) - Status: {self.status}")
+
+    def clean(self):
+        # Kiểm tra ngày bắt đầu và kết thúc
+        if self.review_period_start > self.review_period_end:
+            raise ValidationError("Review period start date must be before the end date.")
+        
+        # Kiểm tra điểm đánh giá
+        for field_name in ['overall_rating', 'goals_achievement', 'communication', 'teamwork', 'initiative']:
+            value = getattr(self, field_name, None)
+            if value is not None and not (1 <= value <= 5):
+                raise ValidationError(f"{field_name.replace('_', ' ').capitalize()} must be between 1 and 5.")
+        
+        # Kiểm tra nhân viên và người đánh giá thuộc cùng phòng ban
+        if self.reviewer.department != self.employee.department:
+            raise ValidationError("Reviewer and employee must belong to the same department.")
+        
+        # Kiểm tra trạng thái hợp lệ
+        valid_transitions = {
+            'draft': ['submitted'],
+            'submitted': ['finalized'],
+            'finalized': [],
+        }
+        if self.pk:  # Chỉ kiểm tra khi đối tượng đã tồn tại
+            previous_status = Performance.objects.get(pk=self.pk).status
+            if self.status not in valid_transitions[previous_status]:
+                raise ValidationError(f"Invalid status transition from {previous_status} to {self.status}.")
+        
+        # Kiểm tra kỳ đánh giá không trùng lặp
+        overlapping_reviews = Performance.objects.filter(
+            employee=self.employee,
+            review_period_start__lte=self.review_period_end,
+            review_period_end__gte=self.review_period_start,
+        ).exclude(pk=self.pk)
+        if overlapping_reviews.exists():
+            raise ValidationError("Review period overlaps with an existing review for this employee.")

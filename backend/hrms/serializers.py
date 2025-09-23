@@ -97,13 +97,59 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
 class PerformanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     reviewer_name = serializers.SerializerMethodField()
-    
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+
     class Meta:
         model = Performance
         fields = '__all__'
-    
+        read_only_fields = ['created_at', 'updated_at', 'status']
+
     def get_employee_name(self, obj):
         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
-    
+
     def get_reviewer_name(self, obj):
-        return f"{obj.reviewer.user.first_name} {obj.reviewer.user.last_name}"
+        # Chỉ trả về tên nếu reviewer là manager
+        if obj.reviewer.role == 'manager':
+            return f"{obj.reviewer.user.first_name} {obj.reviewer.user.last_name}"
+        return None
+
+    def validate(self, data):
+        # Kiểm tra ngày bắt đầu và kết thúc
+        if data['review_period_start'] > data['review_period_end']:
+            raise serializers.ValidationError("Review period start date must be before the end date.")
+        
+        # Kiểm tra giá trị đánh giá
+        for field in ['overall_rating', 'goals_achievement', 'communication', 'teamwork', 'initiative']:
+            if field in data and not (1 <= data[field] <= 5):
+                raise serializers.ValidationError(f"{field.replace('_', ' ').capitalize()} must be between 1 and 5.")
+        
+        # Kiểm tra nhân viên và người đánh giá thuộc cùng phòng ban
+        reviewer = self.context['request'].user.employee
+        employee = data.get('employee')
+        if reviewer.department != employee.department:
+            raise serializers.ValidationError("Reviewer and employee must belong to the same department.")
+        
+        # Kiểm tra trạng thái hợp lệ (nếu có)
+        if self.instance:  # Nếu đang cập nhật
+            valid_transitions = {
+                'draft': ['submitted'],
+                'submitted': ['finalized'],
+                'finalized': [],
+            }
+            previous_status = self.instance.status
+            new_status = data.get('status', previous_status)
+            if new_status not in valid_transitions[previous_status]:
+                raise serializers.ValidationError(
+                    f"Invalid status transition from {previous_status} to {new_status}."
+                )
+        
+        # Kiểm tra kỳ đánh giá không trùng lặp
+        overlapping_reviews = Performance.objects.filter(
+            employee=data['employee'],
+            review_period_start__lte=data['review_period_end'],
+            review_period_end__gte=data['review_period_start'],
+        ).exclude(pk=self.instance.pk if self.instance else None)
+        if overlapping_reviews.exists():
+            raise serializers.ValidationError("Review period overlaps with an existing review for this employee.")
+        
+        return data

@@ -1,7 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, Q
 from django.utils import timezone
 from datetime import timedelta
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
@@ -12,6 +12,12 @@ from .serializers import (
 )
 from .permissions import IsManagerOrReadOnly, IsEmployee
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import ValidationError
+from django_filters.rest_framework import DjangoFilterBackend
+from django.http import HttpResponse
+from django.db import models
+
+
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     queryset = Department.objects.all()
@@ -104,3 +110,70 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
 class PerformanceViewSet(viewsets.ModelViewSet):
     queryset = Performance.objects.select_related('employee__user', 'reviewer__user').all()
     serializer_class = PerformanceSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['employee', 'reviewer', 'status']
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsManagerOrReadOnly()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.employee.role == 'manager':
+            # Manager sees all reviews in their department
+            return self.queryset.filter(employee__department=user.employee.department)
+        # Employee sees only their own reviews
+        return self.queryset.filter(employee__user=user)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def my_reviews(self, request):
+        user = request.user
+        reviews = self.get_queryset().filter(employee__user=user)
+        serializer = self.get_serializer(reviews, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def by_status(self, request):
+        status = request.query_params.get('status')
+        if not status:
+            return Response({'error': 'Status is required'}, status=400)
+        reviews = self.get_queryset().filter(status=status)
+        serializer = self.get_serializer(reviews, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def analytics(self, request):
+        stats = self.get_queryset().aggregate(
+            avg_overall_rating=Avg('overall_rating'),
+            avg_goals_achievement=Avg('goals_achievement'),
+            avg_communication=Avg('communication'),
+            avg_teamwork=Avg('teamwork'),
+            avg_initiative=Avg('initiative'),
+            total_reviews=Count('id'),
+            draft_reviews=Count('id', filter=models.Q(status='draft')),
+            submitted_reviews=Count('id', filter=models.Q(status='submitted')),
+            finalized_reviews=Count('id', filter=models.Q(status='finalized')),
+        )
+        return Response(stats)
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def review_history(self, request, pk=None):
+        employee = self.get_object().employee
+        reviews = self.get_queryset().filter(employee=employee).order_by('-review_period_start')
+        serializer = self.get_serializer(reviews, many=True)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
+    def export_pdf(self, request, pk=None):
+        review = self.get_object()
+        response = HttpResponse(content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="review_{review.id}.pdf"'
+        p = canvas.Canvas(response)
+        p.drawString(100, 800, f"Performance Review for {review.employee.user.get_full_name()}")
+        p.drawString(100, 780, f"Reviewer: {review.reviewer.user.get_full_name()}")
+        p.drawString(100, 760, f"Overall Rating: {review.overall_rating}")
+        p.drawString(100, 740, f"Comments: {review.comments}")
+        p.showPage()
+        p.save()
+        return response
