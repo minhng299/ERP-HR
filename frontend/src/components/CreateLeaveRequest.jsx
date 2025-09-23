@@ -1,29 +1,27 @@
 import { useState, useEffect } from 'react';
 import { getToken, hrapi } from '../services/api.jwt';
 
-
 const CreateLeaveRequest = ({ onSuccess }) => {
   const [formData, setFormData] = useState({
-    leave_type: '',
+    leave_type_id: '',
     start_date: '',
     end_date: '',
     reason: '',
   });
 
   const [leaveTypes, setLeaveTypes] = useState([]);
-  const [employees, setEmployees] = useState([]);
 
   useEffect(() => {
     const token = getToken();
-    const fetchOptions = async () => {
-      const [typesRes, empRes] = await Promise.all([
-        hrapi.getLeaveTypes(token),
-        hrapi.getEmployees(token),
-      ]);
-      setLeaveTypes(typesRes.data);
-      setEmployees(empRes.data);
+    const fetchLeaveTypes = async () => {
+      try {
+        const res = await hrapi.getLeaveTypes(token);
+        setLeaveTypes(res.data);
+      } catch (error) {
+        console.error("Lỗi khi tải loại nghỉ:", error);
+      }
     };
-    fetchOptions();
+    fetchLeaveTypes();
   }, []);
 
   const handleChange = (e) => {
@@ -32,13 +30,30 @@ const CreateLeaveRequest = ({ onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Kiểm tra dữ liệu trước khi gửi
+    const { leave_type_id, start_date, end_date, reason } = formData;
+    if (!leave_type_id || !start_date || !end_date || !reason) {
+      alert("Vui lòng điền đầy đủ thông tin.");
+      return;
+    }
+
+    const payload = {
+      leave_type: formData.leave_type_id,
+      start_date: formData.start_date,
+      end_date: formData.end_date,
+      reason: formData.reason,
+    };
+
     const token = getToken();
+    console.log("Token đang dùng:", token);
     try {
-      await hrapi.createLeaveRequest(formData, token);
+      await hrapi.createLeaveRequest(payload, token);
       alert('Đã gửi đơn nghỉ thành công!');
       if (onSuccess) onSuccess();
     } catch (error) {
-      alert('Gửi đơn nghỉ thất bại!');
+      console.error("Gửi đơn nghỉ thất bại:", error.response?.data || error.message);
+      alert('Gửi đơn nghỉ thất bại! Vui lòng kiểm tra lại thông tin.');
     }
   };
 
@@ -46,7 +61,7 @@ const CreateLeaveRequest = ({ onSuccess }) => {
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-lg shadow space-y-4">
       <h2 className="text-xl font-semibold text-gray-700">Tạo đơn nghỉ</h2>
 
-      <select name="leave_type" value={formData.leave_type} onChange={handleChange} className="input">
+      <select name="leave_type_id" value={formData.leave_type_id} onChange={handleChange} className="input">
         <option value="">-- Chọn loại nghỉ --</option>
         {leaveTypes.map(type => (
           <option key={type.id} value={type.id}>{type.name}</option>

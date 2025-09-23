@@ -30,8 +30,8 @@ class LeaveTypeAdmin(admin.ModelAdmin):
 
 @admin.register(LeaveRequest)
 class LeaveRequestAdmin(admin.ModelAdmin):
-    list_display = ['employee', 'leave_type', 'start_date', 'end_date', 'status', 'request_date']
-    list_filter = ['status', 'leave_type', 'start_date']
+    list_display = ['employee_id', 'leave_type_id', 'start_date', 'end_date', 'status', 'request_date']
+    list_filter = ['status', 'leave_type_id', 'start_date']
     date_hierarchy = 'request_date'
 
 @admin.register(Performance)

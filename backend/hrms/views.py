@@ -75,7 +75,7 @@ class LeaveTypeViewSet(viewsets.ModelViewSet):
 
 
 class LeaveRequestViewSet(viewsets.ModelViewSet):
-    queryset = LeaveRequest.objects.select_related('employee__user', 'leave_type', 'approved_by__user').all()
+    queryset = LeaveRequest.objects.select_related('employee', 'leave_type', 'approved_by').all()
     serializer_class = LeaveRequestSerializer
 
     def get_permissions(self):
@@ -83,6 +83,8 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), IsEmployee()]
         elif self.action in ['approve', 'reject']:  # managers approve/reject
             return [IsAuthenticated(), IsManagerOrReadOnly()]
+        elif self.action == 'cancel':
+            return [IsAuthenticated(), IsEmployee()]
         return [IsAuthenticated()]  # fallback for list/retrieve
     
     @action(detail=True, methods=['post'])
@@ -103,6 +105,22 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave_request.save()
         return Response({'status': 'rejected'})
 
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        leave_request = self.get_object()
+
+        # Chỉ cho phép hủy nếu đơn đang ở trạng thái 'pending'
+        if leave_request.status != 'pending':
+            return Response({'error': 'Chỉ có thể hủy đơn đang chờ duyệt.'}, status=400)
+
+        # Kiểm tra quyền: chỉ nhân viên tạo đơn mới được hủy
+        if leave_request.employee != request.user.employee:
+            return Response({'error': 'Bạn không có quyền hủy đơn này.'}, status=403)
+
+        leave_request.status = 'cancelled'
+        leave_request.response_date = timezone.now()
+        leave_request.save()
+        return Response({'status': 'cancelled'})
 
 class PerformanceViewSet(viewsets.ModelViewSet):
     queryset = Performance.objects.select_related('employee__user', 'reviewer__user').all()
