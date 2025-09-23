@@ -36,6 +36,20 @@ class LeaveRequestAdmin(admin.ModelAdmin):
 
 @admin.register(Performance)
 class PerformanceAdmin(admin.ModelAdmin):
-    list_display = ['employee', 'reviewer', 'overall_rating', 'status']
-    list_filter = ['status', 'reviewer']
-    search_fields = ['employee__user__first_name', 'employee__user__last_name']
+    list_display = [
+        'employee', 
+        'reviewer', 
+        'review_period_start', 
+        'review_period_end', 
+        'overall_rating', 
+        'status',
+        'created_at'
+    ]
+    list_filter = ['status', 'reviewer', 'review_period_start']
+    search_fields = [
+        'employee__user__first_name', 
+        'employee__user__last_name', 
+        'reviewer__user__first_name', 
+        'reviewer__user__last_name'
+    ]
+    date_hierarchy = 'created_at'

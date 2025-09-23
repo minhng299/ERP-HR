@@ -108,7 +108,7 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
 
 
 class PerformanceViewSet(viewsets.ModelViewSet):
-    queryset = Performance.objects.select_related('employee__user', 'reviewer__user').all()
+    queryset = Performance.objects.select_related('employee__user', 'reviewer__user')
     serializer_class = PerformanceSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'reviewer', 'status']
@@ -119,22 +119,22 @@ class PerformanceViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def get_queryset(self):
+        """Manager thấy review trong department, Employee chỉ thấy review của mình"""
         user = self.request.user
-        if user.employee.role == 'manager':
-            # Manager sees all reviews in their department
+        if hasattr(user, "employee") and user.employee.role == "manager":
             return self.queryset.filter(employee__department=user.employee.department)
-        # Employee sees only their own reviews
         return self.queryset.filter(employee__user=user)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_reviews(self, request):
-        user = request.user
-        reviews = self.get_queryset().filter(employee__user=user)
+        """Employee xem review của chính mình"""
+        reviews = self.get_queryset().filter(employee__user=request.user)
         serializer = self.get_serializer(reviews, many=True)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def by_status(self, request):
+        """Lọc review theo status"""
         status = request.query_params.get('status')
         if not status:
             return Response({'error': 'Status is required'}, status=400)
@@ -144,6 +144,7 @@ class PerformanceViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def analytics(self, request):
+        """Thống kê tổng quan"""
         stats = self.get_queryset().aggregate(
             avg_overall_rating=Avg('overall_rating'),
             avg_goals_achievement=Avg('goals_achievement'),
@@ -151,21 +152,23 @@ class PerformanceViewSet(viewsets.ModelViewSet):
             avg_teamwork=Avg('teamwork'),
             avg_initiative=Avg('initiative'),
             total_reviews=Count('id'),
-            draft_reviews=Count('id', filter=models.Q(status='draft')),
-            submitted_reviews=Count('id', filter=models.Q(status='submitted')),
-            finalized_reviews=Count('id', filter=models.Q(status='finalized')),
+            draft_reviews=Count('id', filter=Q(status='draft')),
+            submitted_reviews=Count('id', filter=Q(status='submitted')),
+            finalized_reviews=Count('id', filter=Q(status='finalized')),
         )
         return Response(stats)
 
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def review_history(self, request, pk=None):
+        """Xem lịch sử review của 1 employee"""
         employee = self.get_object().employee
-        reviews = self.get_queryset().filter(employee=employee).order_by('-review_period_start')
+        reviews = self.queryset.filter(employee=employee).order_by('-review_period_start')
         serializer = self.get_serializer(reviews, many=True)
         return Response(serializer.data)
 
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def export_pdf(self, request, pk=None):
+        """Xuất review thành PDF"""
         review = self.get_object()
         response = HttpResponse(content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="review_{review.id}.pdf"'
