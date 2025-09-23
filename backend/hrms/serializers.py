@@ -1,6 +1,61 @@
+
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
+
+# --- SignUp Serializer ---
+
+class SignUpSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    password = serializers.CharField(write_only=True)
+    email = serializers.EmailField()
+    first_name = serializers.CharField(max_length=30)
+    last_name = serializers.CharField(max_length=150)
+    employee_id = serializers.CharField(max_length=20)
+    phone_number = serializers.CharField(max_length=17)
+    address = serializers.CharField()
+    date_of_birth = serializers.DateField()
+    hire_date = serializers.DateField()
+    department = serializers.PrimaryKeyRelatedField(queryset=Department.objects.all())
+    position = serializers.PrimaryKeyRelatedField(queryset=Position.objects.all())
+    salary = serializers.DecimalField(max_digits=10, decimal_places=2)
+    manager = serializers.PrimaryKeyRelatedField(queryset=Employee.objects.all(), required=False, allow_null=True)
+    profile_picture = serializers.URLField(required=False, allow_blank=True)
+    # role field is omitted from input; always set to 'employee' in create()
+
+    def validate_username(self, value):
+        if User.objects.filter(username=value).exists():
+            raise serializers.ValidationError("Username already exists.")
+        return value
+
+    def validate_employee_id(self, value):
+        if Employee.objects.filter(employee_id=value).exists():
+            raise serializers.ValidationError("Employee ID already exists.")
+        return value
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            password=validated_data['password'],
+            email=validated_data['email'],
+            first_name=validated_data['first_name'],
+            last_name=validated_data['last_name'],
+        )
+        employee = Employee.objects.create(
+            user=user,
+            employee_id=validated_data['employee_id'],
+            phone_number=validated_data['phone_number'],
+            address=validated_data['address'],
+            date_of_birth=validated_data['date_of_birth'],
+            hire_date=validated_data['hire_date'],
+            department=validated_data['department'],
+            position=validated_data['position'],
+            salary=validated_data['salary'],
+            manager=validated_data.get('manager'),
+            profile_picture=validated_data.get('profile_picture', ''),
+            role='employee',  # Always set to employee
+        )
+        return employee
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
