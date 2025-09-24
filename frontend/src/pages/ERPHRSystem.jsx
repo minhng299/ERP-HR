@@ -1,4 +1,5 @@
-import { Users, Calendar, FileText, TrendingUp } from 'lucide-react';
+import { Users, Calendar, FileText, TrendingUp, DollarSign } from 'lucide-react';
+import Salary from './Salary';
 import Dashboard from './Dashboard';
 import EmployeeManagement from './EmployeeManagement';
 import AttendanceManagement from './AttendanceManagement';
@@ -14,6 +15,7 @@ const tabs = [
   { id: 'attendance', name: 'Attendance', icon: Calendar, path: '/attendance' },
   { id: 'leave', name: 'Leave Management', icon: FileText, path: '/leave' },
   { id: 'performance', name: 'Performance', icon: TrendingUp, path: '/performance' },
+  { id: 'salary', name: 'Salary', icon: DollarSign, path: '/salary' },
 ];
 
 const ERPHRSystem = () => {
@@ -48,6 +50,7 @@ const ERPHRSystem = () => {
           <Route path="/attendance" element={<AttendanceManagement />} />
           <Route path="/leave" element={<LeaveManagement />} />
           <Route path="/performance" element={<PerformanceManagement />} />
+          <Route path="/salary" element={<Salary />} />
           <Route path="/employees/:id" element={<EmployeeDetail />} />
           <Route path="/" element={<Dashboard />} />
         </Routes>
