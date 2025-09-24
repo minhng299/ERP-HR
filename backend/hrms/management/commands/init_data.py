@@ -45,6 +45,7 @@ class Command(BaseCommand):
         users = [
             {'username': 'manager1', 'email': 'manager1@example.com', 'password': 'admin123', 'first_name': 'Alice', 'last_name': 'Manager'},
             {'username': 'employee1', 'email': 'employee1@example.com', 'password': 'admin123', 'first_name': 'Bob', 'last_name': 'Employee'},
+            {'username': 'employee2', 'email': 'employee2@example.com', 'password': 'admin123', 'first_name': 'Charlie', 'last_name': 'Employee'},
         ]
         emp_objs = []
         for i, user_data in enumerate(users):
@@ -62,9 +63,9 @@ class Command(BaseCommand):
                 address='123 Main St',
                 date_of_birth=date(1990+i, 1, 1),
                 hire_date=date(2020, 1, 1),
-                department=dept_objs[i],
-                position=pos_objs[i],
-                salary=90000 + i*5000,
+                department=dept_objs[min(i, len(dept_objs)-1)],
+                position=pos_objs[min(i, len(pos_objs)-1)],
+                salary=6000000 if i > 0 else 9000000,
                 manager=None,
                 status='active',
                 profile_picture='',
@@ -72,6 +73,31 @@ class Command(BaseCommand):
             emp.role = 'manager' if i == 0 else 'employee'
             emp.save()
             emp_objs.append(emp)
+
+        # Tạo dữ liệu chấm công cho employee1 (vắng 2 buổi) và employee2 (đi làm đầy đủ)
+        from hrms.models import Attendance
+        from datetime import time, timedelta
+        # Tháng 9/2025, giả sử làm việc từ 1-5
+        work_days = [date(2025, 9, d) for d in range(1, 6)]
+        # employee1 vắng ngày 2, 4
+        for d in work_days:
+            if d.day not in [2, 4]:
+                Attendance.objects.get_or_create(
+                    employee=emp_objs[1],
+                    date=d,
+                    check_in=time(8,0),
+                    check_out=time(17,0),
+                    break_duration=timedelta(hours=1),
+                )
+        # employee2 đi làm đầy đủ
+        for d in work_days:
+            Attendance.objects.get_or_create(
+                employee=emp_objs[2],
+                date=d,
+                check_in=time(8,0),
+                check_out=time(17,0),
+                break_duration=timedelta(hours=1),
+            )
 
         # Create sample performance review
         if len(emp_objs) > 1:

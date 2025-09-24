@@ -72,6 +72,9 @@ export const hrapi = {
   // Performance
   getPerformances: () => api.get('/performances/'),
   createPerformance: (data) => api.post('/performances/', data),
+
+  // Payroll
+  getMySalary: () => api.get('/payroll/my-salary/'),
 };
 
 export default api;

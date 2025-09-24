@@ -36,7 +36,10 @@
 5. Frontend calls `/api/employees/me/` to fetch current user's employee profile and role.
 6. Role is used to control access to features and routes in the frontend.
 
-## What To Do Next
+
+
+
+
 
   - **Role-Based UI:**
     - Add employee self-service features (view own info, request leave, view attendance).

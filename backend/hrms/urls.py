@@ -18,4 +18,5 @@ router.register(r'performances', PerformanceViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('signup/', SignUpView.as_view(), name='signup'),
+    path('payroll/', include('payroll.urls')),
 ]

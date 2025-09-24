@@ -37,6 +37,7 @@ class Employee(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
     position = models.ForeignKey(Position, on_delete=models.CASCADE)
     salary = models.DecimalField(max_digits=10, decimal_places=2)
+    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Lương thực nhận sau khi bị trừ")
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=EMPLOYMENT_STATUS, default='active')
     profile_picture = models.URLField(blank=True)
