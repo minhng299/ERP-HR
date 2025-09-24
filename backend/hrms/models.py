@@ -104,10 +104,6 @@ class LeaveRequest(models.Model):
             self.days_requested = (self.end_date - self.start_date).days + 1
         super().save(*args, **kwargs)
 
-from django.db import models
-from django.core.exceptions import ValidationError
-from datetime import date
-
 class Performance(models.Model):
     RATING_CHOICES = [
         (1, 'Poor'),
@@ -120,6 +116,7 @@ class Performance(models.Model):
     STATUS_CHOICES = [
         ('draft', 'Draft'),
         ('submitted', 'Submitted'),
+        ('feedback', 'Feedback'),
         ('finalized', 'Finalized'),
     ]
 
@@ -184,7 +181,8 @@ class Performance(models.Model):
         if self.pk:
             valid_transitions = {
                 'draft': ['submitted'],
-                'submitted': ['finalized'],
+                'submitted': ['feedback', 'finalized'],  # manager có thể finalize hoặc chuyển sang feedback để employee phản hồi
+                'feedback': ['submitted'],               # manager chỉnh sửa lại sau khi employee feedback
                 'finalized': [],
             }
             prev_status = Performance.objects.get(pk=self.pk).status

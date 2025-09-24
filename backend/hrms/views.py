@@ -114,9 +114,12 @@ class PerformanceViewSet(viewsets.ModelViewSet):
     filterset_fields = ['employee', 'reviewer', 'status']
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action in ['create', 'destroy']:
             return [IsAuthenticated(), IsManagerOrReadOnly()]
+        if self.action in ['update', 'partial_update']:
+            return [IsAuthenticated()]  # cả manager và employee đều update được nhưng employee chỉ được update employee_comments
         return [IsAuthenticated()]
+
 
     def get_queryset(self):
         """Manager thấy review trong department, Employee chỉ thấy review của mình"""

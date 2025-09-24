@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
+from django.core.exceptions import ValidationError
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
@@ -113,3 +114,43 @@ class PerformanceSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         validated_data['reviewer'] = self.context['request'].user.employee
         return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        request = self.context.get("request")
+        role = getattr(request.user.employee, "role", None)
+
+        # Nếu là employee → chỉ được thêm employee_comments khi status = submitted
+        if role == "employee":
+            if instance.status != "submitted":
+                raise serializers.ValidationError("Employee chỉ được phản hồi khi review đang ở trạng thái submitted")
+            instance.employee_comments = validated_data.get("employee_comments", instance.employee_comments)
+            instance.status = "feedback"  # đổi trạng thái sang feedback
+            instance.save()
+            return instance
+
+        # Nếu là manager → xử lý logic draft, feedback, finalize
+        if role == "manager":
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+            try:
+                instance.full_clean()
+            except ValidationError as e:
+                raise serializers.ValidationError(e.message_dict or e.messages)
+            instance.save()
+            return instance
+
+        return super().update(instance, validated_data)
+    
+    def validate(self, attrs):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            reviewer = getattr(request.user, "employee", None)
+            if reviewer:
+                attrs["reviewer"] = reviewer
+
+        instance = Performance(**attrs)
+        try:
+            instance.full_clean()
+        except ValidationError as e:
+            raise serializers.ValidationError(e.message_dict or e.messages)
+        return attrs
