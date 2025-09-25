@@ -109,7 +109,9 @@ class PerformanceSerializer(serializers.ModelSerializer):
         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
 
     def get_reviewer_name(self, obj):
-        return f"{obj.reviewer.user.first_name} {obj.reviewer.user.last_name}"
+        if obj.reviewer:
+            return f"{obj.reviewer.user.first_name} {obj.reviewer.user.last_name}"
+        return None
 
     def create(self, validated_data):
         validated_data['reviewer'] = self.context['request'].user.employee
@@ -119,38 +121,43 @@ class PerformanceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         role = getattr(request.user.employee, "role", None)
 
-        # Nếu là employee → chỉ được thêm employee_comments khi status = submitted
+        # --- Employee update (feedback only) ---
         if role == "employee":
             if instance.status != "submitted":
-                raise serializers.ValidationError("Employee chỉ được phản hồi khi review đang ở trạng thái submitted")
+                raise serializers.ValidationError(
+                    {"non_field_errors": ["Employee chỉ được phản hồi khi review đang ở trạng thái submitted"]}
+                )
             instance.employee_comments = validated_data.get("employee_comments", instance.employee_comments)
-            instance.status = "feedback"  # đổi trạng thái sang feedback
+            instance.status = "feedback"  # đổi trạng thái
             instance.save()
             return instance
 
-        # Nếu là manager → xử lý logic draft, feedback, finalize
         if role == "manager":
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)
-            try:
-                instance.full_clean()
-            except ValidationError as e:
-                raise serializers.ValidationError(e.message_dict or e.messages)
+            if request and request.method == "PUT":
+                try:
+                    instance.full_clean()
+                except ValidationError as e:
+                    raise serializers.ValidationError(e.message_dict or e.messages)
+
             instance.save()
             return instance
-
+        # Nếu role khác thì fallback
         return super().update(instance, validated_data)
     
     def validate(self, attrs):
         request = self.context.get("request")
+        # auto gán reviewer nếu có user.employee
         if request and request.user.is_authenticated:
-            reviewer = getattr(request.user, "employee", None)
+            reviewer = getattr(request.user, "manager", None)
             if reviewer:
                 attrs["reviewer"] = reviewer
-
-        instance = Performance(**attrs)
-        try:
-            instance.full_clean()
-        except ValidationError as e:
-            raise serializers.ValidationError(e.message_dict or e.messages)
+        # Chỉ validate toàn bộ khi POST hoặc PUT
+        if request and request.method in ["POST", "PUT"]:
+            instance = Performance(**attrs)
+            try:
+                instance.full_clean()
+            except ValidationError as e:
+                raise serializers.ValidationError(e.message_dict or e.messages)
         return attrs

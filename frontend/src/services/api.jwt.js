@@ -74,7 +74,7 @@ export const hrapi = {
   getPerformances: () => api.get('/performances/'),                     
   getPerformance: (id) => api.get(`/performances/${id}/`),              
   createPerformance: (data) => api.post('/performances/', data),        
-  updatePerformance: (id, data) => api.put(`/performances/${id}/`, data), 
+  updatePerformance: (id, data) => api.patch(`/performances/${id}/`, data), 
   deletePerformance: (id) => api.delete(`/performances/${id}/`),        
 
   getMyReviews: () => api.get('/performances/my_reviews/'),            

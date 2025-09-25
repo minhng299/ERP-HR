@@ -50,6 +50,22 @@ const PerformanceManagement = () => {
     });
   };
 
+  const fetchPerformances = async () => {
+    try {
+      const res = await hrapi.getPerformances();
+      setPerformances(res.data);
+  
+      const analyticsRes = await hrapi.getPerformanceAnalytics();
+      setAnalytics(analyticsRes.data);
+    } catch (err) {
+      console.error("Failed to fetch performances:", err);
+    }
+  };
+  
+  useEffect(() => {
+    fetchPerformances();
+  }, []);
+  
   const getRatingColor = (rating) => {
     if (rating >= 4) return 'text-green-600';
     if (rating >= 3) return 'text-yellow-600';
@@ -186,6 +202,10 @@ const PerformanceManagement = () => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         review={selectedReview}
+        onUpdated={(updatedReview) => {
+          fetchPerformances();
+          setSelectedReview(updatedReview);
+        }}
       />
       <ViewReviewModal
         isOpen={isViewModalOpen}
