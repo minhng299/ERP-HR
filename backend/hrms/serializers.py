@@ -17,9 +17,11 @@ class DepartmentSerializer(serializers.ModelSerializer):
 
 class PositionSerializer(serializers.ModelSerializer):
     department_name = serializers.CharField(source='department.name', read_only=True)
+    department_name = serializers.CharField(source='department.name', read_only=True)
     class Meta:
         model = Position
         fields = '__all__'
+        # department_name sẽ tự động được trả về cùng các trường khác
 
 class EmployeeSerializer(serializers.ModelSerializer):
     user = UserSerializer()

@@ -1,3 +1,33 @@
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from hrms.models import Employee
+from .services import PayrollService
+
+class SetBaseSalaryView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        employee_id = request.data.get('employee_id')
+        salary = request.data.get('salary')
+        if not employee_id or salary is None:
+            return Response({'error': 'Thiếu thông tin.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            employee = PayrollService.set_base_salary(user, employee_id, salary)
+            # Lấy lại thông tin lương mới nhất từ DB
+            employee.refresh_from_db()
+            return Response({
+                'success': True,
+                'employee_id': employee.id,
+                'salary': str(employee.salary),
+                'message': f"Lương cơ bản mới của nhân viên {employee.user.get_full_name()} là {employee.salary}"
+            })
+        except PermissionError as e:
+            return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -15,12 +45,36 @@ class MySalaryView(APIView):
             employee = Employee.objects.get(user=user)
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
-        # Lấy lương tháng hiện tại
         today = date.today()
+        # Tính lại lương dựa trên số ngày nghỉ/thưởng, update vào SalaryRecord tháng hiện tại
+        from payroll.services import PayrollService
+        # (bonus mặc định = 0, có thể mở rộng sau)
+        base_salary = employee.salary
+        bonus = 0
+        penalty_per_day = 100000
+        late_days, absent_days = PayrollService.get_late_or_absent_days(employee, today)
+        deductions = (late_days + absent_days) * penalty_per_day
+        total_salary = base_salary + bonus - deductions
+        # Update hoặc tạo mới SalaryRecord tháng này
+        from payroll.models import SalaryRecord
+        month = today.replace(day=1)
         record = SalaryRecord.objects.filter(employee_id=employee.id, month__year=today.year, month__month=today.month).first()
-        if not record:
-            # Nếu chưa có, tính và tạo
-            record = PayrollService.create_salary_record(employee.id, employee.salary, 0, today)
+        if record:
+            record.base_salary = base_salary
+            record.bonus = bonus
+            record.deductions = deductions
+            record.total_salary = total_salary
+            record.month = month
+            record.save()
+        else:
+            record = SalaryRecord.objects.create(
+                employee_id=employee.id,
+                base_salary=base_salary,
+                bonus=bonus,
+                deductions=deductions,
+                total_salary=total_salary,
+                month=month
+            )
         return Response({
             'net_salary': record.total_salary,
             'base_salary': record.base_salary,
