@@ -75,6 +75,7 @@ export const hrapi = {
 
   // Payroll
   getMySalary: () => api.get('/payroll/my-salary/'),
+  setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
 };
 
 export default api;

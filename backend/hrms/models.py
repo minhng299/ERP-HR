@@ -50,6 +50,10 @@ class Employee(models.Model):
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} ({self.employee_id})"
 
+    @property
+    def department_name(self):
+        return self.department.name if self.department else None
+
 class Attendance(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     date = models.DateField()

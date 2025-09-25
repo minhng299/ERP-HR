@@ -1,5 +1,7 @@
-import { Users, Calendar, FileText, TrendingUp, DollarSign } from 'lucide-react';
+import { Users, Calendar, FileText, TrendingUp, DollarSign, Edit } from 'lucide-react';
 import Salary from './Salary';
+import SetSalary from './SetSalary';
+import { useAuth } from '../contexts/AuthContext';
 import Dashboard from './Dashboard';
 import EmployeeManagement from './EmployeeManagement';
 import AttendanceManagement from './AttendanceManagement';
@@ -9,7 +11,8 @@ import EmployeeDetail from './EmployeeDetail';
 import { Link, Routes, Route, useLocation } from 'react-router-dom';
 
 // Main App Component
-const tabs = [
+
+const baseTabs = [
   { id: 'dashboard', name: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
   { id: 'employees', name: 'Employees', icon: Users, path: '/employees' },
   { id: 'attendance', name: 'Attendance', icon: Calendar, path: '/attendance' },
@@ -20,6 +23,10 @@ const tabs = [
 
 const ERPHRSystem = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const tabs = user && user.role === 'manager'
+    ? [...baseTabs, { id: 'set-salary', name: 'Set Salary', icon: Edit, path: '/set-salary' }]
+    : baseTabs;
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
@@ -51,6 +58,9 @@ const ERPHRSystem = () => {
           <Route path="/leave" element={<LeaveManagement />} />
           <Route path="/performance" element={<PerformanceManagement />} />
           <Route path="/salary" element={<Salary />} />
+          {user && user.role === 'manager' && (
+            <Route path="/set-salary" element={<SetSalary />} />
+          )}
           <Route path="/employees/:id" element={<EmployeeDetail />} />
           <Route path="/" element={<Dashboard />} />
         </Routes>
