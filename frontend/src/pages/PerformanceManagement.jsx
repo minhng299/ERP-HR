@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Plus, Eye, Edit, Download } from 'lucide-react';
 import { hrapi, login, getToken } from '../services/api.jwt';
+import { useAuth } from "../contexts/AuthContext"; 
 import NewReviewModal from "../components/performance/NewReviewModal";
 import EditReviewModal from "../components/performance/EditReviewModal";
 import ViewReviewModal from "../components/performance/ViewReviewModal";
 
 const PerformanceManagement = () => {
+  const { user } = useAuth();  //lấy user.role
   const [performances, setPerformances] = useState([]);
   const [analytics, setAnalytics] = useState({});
   const [statusFilter, setStatusFilter] = useState('all');
@@ -22,7 +24,6 @@ const PerformanceManagement = () => {
         token = getToken();
       }
 
-      // Fetch performances and analytics
       hrapi.getPerformances().then(response => setPerformances(response.data));
       hrapi.getPerformanceAnalytics().then(response => setAnalytics(response.data));
     };
@@ -54,7 +55,6 @@ const PerformanceManagement = () => {
     try {
       const res = await hrapi.getPerformances();
       setPerformances(res.data);
-  
       const analyticsRes = await hrapi.getPerformanceAnalytics();
       setAnalytics(analyticsRes.data);
     } catch (err) {
@@ -79,15 +79,18 @@ const PerformanceManagement = () => {
 
   return (
     <div className="p-6">
+      {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Performance Management</h1>
-        <button 
-          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2" 
-          onClick={() => setIsNewModalOpen(true)}
-        >
-          <Plus className="h-4 w-4" />
-          <span>New Review</span>
-        </button>
+        {user?.role === "manager" && (
+          <button 
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2" 
+            onClick={() => setIsNewModalOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            <span>New Review</span>
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -161,6 +164,7 @@ const PerformanceManagement = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
+                    {/* View cho tất cả */}
                     <button 
                       className="text-blue-600 hover:text-blue-900"
                       onClick={() => {
@@ -170,21 +174,40 @@ const PerformanceManagement = () => {
                     >
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button 
-                      className="text-green-600 hover:text-green-900"
-                      onClick={() => {
-                        setSelectedReview(performance);
-                        setIsEditModalOpen(true);
-                      }}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button 
-                      className="text-purple-600 hover:text-purple-900"
-                      onClick={() => handleExportPDF(performance.id)}
-                    >
-                      <Download className="h-4 w-4" />
-                    </button>
+
+                    {/* Manager: Edit + Export */}
+                    {user?.role === "manager" && (
+                      <>
+                        <button 
+                          className="text-green-600 hover:text-green-900"
+                          onClick={() => {
+                            setSelectedReview(performance);
+                            setIsEditModalOpen(true);
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button 
+                          className="text-purple-600 hover:text-purple-900"
+                          onClick={() => handleExportPDF(performance.id)}
+                        >
+                          <Download className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Employee: chỉ được feedback khi submitted */}
+                    {user?.role === "employee" && performance.status === "submitted" && (
+                      <button 
+                        className="text-green-600 hover:text-green-900"
+                        onClick={() => {
+                          setSelectedReview(performance);
+                          setIsEditModalOpen(true);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -202,6 +225,7 @@ const PerformanceManagement = () => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         review={selectedReview}
+        role={user?.role}   // 👈 truyền role để modal biết ai đang sửa
         onUpdated={(updatedReview) => {
           fetchPerformances();
           setSelectedReview(updatedReview);

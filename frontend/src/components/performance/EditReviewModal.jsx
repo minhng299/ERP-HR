@@ -1,8 +1,8 @@
 // src/components/performance/EditReviewModal.jsx
 import { useState, useEffect } from "react";
-import { hrapi } from "../../services/api.jwt"; // import service đã có
+import { hrapi } from "../../services/api.jwt";
 
-const EditReviewModal = ({ isOpen, onClose, review, onUpdated }) => {
+const EditReviewModal = ({ isOpen, onClose, review, onUpdated, role }) => {
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
   const ratingFields = [
@@ -36,7 +36,10 @@ const EditReviewModal = ({ isOpen, onClose, review, onUpdated }) => {
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (ratingFields.includes(name)) {
-      setFormData((prev) => ({ ...prev, [name]: value === "" ? null : parseInt(value, 10) }));
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value === "" ? null : parseInt(value, 10),
+      }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -75,86 +78,74 @@ const EditReviewModal = ({ isOpen, onClose, review, onUpdated }) => {
             />
           </div>
 
-          {/* Review Period */}
-          <div className="flex gap-2">
-            <input
-              type="date"
-              name="review_period_start"
-              value={formData.review_period_start || ""}
-              onChange={handleChange}
-              className="flex-1 border rounded px-3 py-2"
-            />
-            <input
-              type="date"
-              name="review_period_end"
-              value={formData.review_period_end || ""}
-              onChange={handleChange}
-              className="flex-1 border rounded px-3 py-2"
-            />
-          </div>
+          {/* Manager view: ratings + comments */}
+          {role === "manager" && (
+            <>
+              {/* Ratings */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {ratingFields.map((name) => (
+                  <div key={name}>
+                    <label className="block text-sm mb-1">
+                      {name.replace(/_/g, " ")}
+                    </label>
+                    <select
+                      name={name}
+                      value={formData[name] ?? ""}
+                      onChange={handleChange}
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      <option value="">-- Select --</option>
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                    {errors[name] && (
+                      <p className="text-red-600 text-sm">{errors[name]}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
 
-          {/* Ratings */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {ratingFields.map((name) => (
-              <div key={name}>
-                <label className="block text-sm mb-1">{name.replace(/_/g, " ")}</label>
-                <select
-                  name={name}
-                  value={formData[name] ?? ""}
+              {/* Reviewer Comments */}
+              <div>
+                <label className="block text-sm mb-1">Reviewer Comments</label>
+                <textarea
+                  name="comments"
+                  rows={3}
+                  value={formData.comments || ""}
                   onChange={handleChange}
                   className="w-full border rounded px-3 py-2"
-                >
-                  <option value="">-- Select --</option>
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-                {errors[name] && <p className="text-red-600 text-sm">{errors[name]}</p>}
+                />
               </div>
-            ))}
-          </div>
 
-          {/* Comments */}
-          <div>
-            <label className="block text-sm mb-1">Reviewer Comments</label>
-            <textarea
-              name="comments"
-              rows={3}
-              value={formData.comments || ""}
-              onChange={handleChange}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
+              {/* Status (readonly, không cho chỉnh) */}
+              <div>
+                <label className="block text-sm mb-1">Status</label>
+                <input
+                  type="text"
+                  value={formData.status}
+                  readOnly
+                  className="w-full border rounded px-3 py-2 bg-gray-100"
+                />
+              </div>
+            </>
+          )}
 
-          {/* Status */}
-          <div>
-            <label className="block text-sm mb-1">Status</label>
-            <select
-              name="status"
-              value={formData.status || "draft"}
-              onChange={handleChange}
-              className="w-full border rounded px-3 py-2"
-            >
-              <option value="draft">Draft</option>
-              <option value="submitted">Submitted</option>
-              <option value="feedback">Feedback</option>
-              <option value="finalized">Finalized</option>
-            </select>
-          </div>
-
-          {/* Employee comments */}
-          <div>
-            <label className="block text-sm mb-1">Employee Comments</label>
-            <textarea
-              name="employee_comments"
-              rows={2}
-              value={formData.employee_comments || ""}
-              onChange={handleChange}
-              className="w-full border rounded px-3 py-2"
-            />
-          </div>
+          {/* Employee view: chỉ feedback khi status = submitted */}
+          {role === "employee" && formData.status === "submitted" && (
+            <div>
+              <label className="block text-sm mb-1">Your Feedback</label>
+              <textarea
+                name="employee_comments"
+                rows={3}
+                value={formData.employee_comments || ""}
+                onChange={handleChange}
+                className="w-full border rounded px-3 py-2"
+              />
+            </div>
+          )}
 
           {/* Error hiển thị */}
           {errors.non_field_errors && (
@@ -162,10 +153,17 @@ const EditReviewModal = ({ isOpen, onClose, review, onUpdated }) => {
           )}
 
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2 border rounded">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border rounded"
+            >
               Cancel
             </button>
-            <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-green-600 text-white rounded"
+            >
               Update
             </button>
           </div>
