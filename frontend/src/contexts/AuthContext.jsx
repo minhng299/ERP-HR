@@ -9,25 +9,30 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (getToken()) {
-        try {
-          // Fetch current employee info
-          const res = await hrapi.getEmployee('me');
-          console.log("employye",res)
-          setUser(res.data);
-        } catch {
-          setUser(null);
-        }
+  const fetchUser = async () => {
+    if (getToken()) {
+      try {
+        const res = await hrapi.getEmployee('me');
+        setUser(res.data);
+      } catch {
+        setUser(null);
       }
-      setLoading(false);
-    };
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchUser();
   }, []);
 
+  // Expose refreshUser and setLoading for login flow
+  const refreshUser = async () => {
+    setLoading(true);
+    await fetchUser();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ user, loading, setLoading, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

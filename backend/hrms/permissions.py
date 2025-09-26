@@ -1,8 +1,13 @@
-from rest_framework.permissions import BasePermission
+# permissions.py
+from rest_framework.permissions import BasePermission, SAFE_METHODS
 
-class IsManager(BasePermission):
+class IsManagerOrReadOnly(BasePermission):
     def has_permission(self, request, view):
-        return hasattr(request.user, 'employee') and request.user.employee.role == 'manager'
+        if not hasattr(request.user, 'employee'):
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user.employee.role == 'manager'
 
 class IsEmployee(BasePermission):
     def has_permission(self, request, view):

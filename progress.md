@@ -6,7 +6,6 @@
   - HRMS app with models for Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance.
   - API endpoints for CRUD operations on all models.
   - JWT authentication (SimpleJWT) with extended token lifetime.
-  - CORS configured for local frontend development.
   - Employee creation supports nested user creation (username, password, email, first/last name).
   - Leave requests are created by employees and can be approved/rejected by managers.
   - Dashboard stats endpoint for HR overview.
@@ -21,7 +20,6 @@
     - Employee detail page accessible via `/employees/:id`, only editable by managers.
     - JWT login flow with protected routes and redirect after login.
     - Employee creation modal with all required fields, including user info, department/position selection, and validation.
-    - Fetches department and position lists from backend for dropdowns.
     - All main features are manager/admin-oriented (CRUD, approval, stats).
     - **Role-based access:**
       - AuthContext fetches current user and role after login.
