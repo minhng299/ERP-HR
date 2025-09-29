@@ -1,6 +1,7 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.utils.timezone import now
 from django.shortcuts import render
 from .models import LeaveType
 from django.db.models import Count, Avg
@@ -121,6 +122,21 @@ class LeaveRequestViewSet(viewsets.ModelViewSet):
         leave_request.response_date = timezone.now()
         leave_request.save()
         return Response({'status': 'cancelled'})
+
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        today = now()
+        start_of_month = today.replace(day=1)
+
+        pending = LeaveRequest.objects.filter(status='pending').count()
+        approved = LeaveRequest.objects.filter(status='approved', response_date__gte=start_of_month).count()
+        rejected = LeaveRequest.objects.filter(status='rejected', response_date__gte=start_of_month).count()
+
+        return Response({
+            'pending': pending,
+            'approved_this_month': approved,
+            'rejected_this_month': rejected,
+        })
 
 class PerformanceViewSet(viewsets.ModelViewSet):
     queryset = Performance.objects.select_related('employee__user', 'reviewer__user').all()

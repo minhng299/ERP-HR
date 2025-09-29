@@ -99,6 +99,12 @@ export const hrapi = {
       },
     }),
 
+    getLeaveStats: (token) =>
+    api.get('/leave-requests/stats/', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+
     // Leave Type
   getLeaveTypes: (token) =>
     api.get('/leave-types/', {

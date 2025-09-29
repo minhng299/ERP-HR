@@ -12,23 +12,37 @@ const LeaveManagement = () => {
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [stats, setStats] = useState({ pending: 0, approved_this_month: 0, rejected_this_month: 0 });
 
   useEffect(() => {
     const fetchData = async () => {
       const token = getToken();
-      const res = await hrapi.getLeaveRequests(token);
-      const allRequests = res.data;
 
-      const filtered = user?.role === 'employee'
-        ? allRequests.filter(req => req.employee_id === user.id)
-        : allRequests;
+      try {
+        // Lấy danh sách đơn nghỉ
+        const res = await hrapi.getLeaveRequests(token);
+        const allRequests = res.data;
 
-      setLeaveRequests(filtered);
-      setLoading(false);
+        const filtered = user?.role === 'employee'
+          ? allRequests.filter(req => req.employee_id === user.id)
+          : allRequests;
+
+        setLeaveRequests(filtered);
+
+        // Nếu là manager thì gọi thêm API thống kê
+        if (user?.role === 'manager') {
+          const statsRes = await hrapi.getLeaveStats(token);
+          setStats(statsRes.data); // 👈 set vào state để hiển thị
+        }
+      } catch (error) {
+        console.error('Lỗi khi tải dữ liệu:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchData();
-  }, [user]);
+  }, []);
 
   const filteredRequests = leaveRequests.filter(request =>
     filterStatus === 'all' || request.status === filterStatus
@@ -90,21 +104,22 @@ const LeaveManagement = () => {
           <option value="pending">Pending</option>
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
+          <option value="cancelled">Cancelled</option>
         </select>
       </div>
 
       {user?.role === 'manager' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-yellow-600">12</div>
+            <div className="text-2xl font-bold text-yellow-600">{stats.pending}</div>
             <div className="text-sm text-gray-500">Pending Requests</div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-green-600">85</div>
+            <div className="text-2xl font-bold text-green-600">{stats.approved_this_month}</div>
             <div className="text-sm text-gray-500">Approved This Month</div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
-            <div className="text-2xl font-bold text-red-600">8</div>
+            <div className="text-2xl font-bold text-red-600">{stats.rejected_this_month}</div>
             <div className="text-sm text-gray-500">Rejected This Month</div>
           </div>
         </div>
