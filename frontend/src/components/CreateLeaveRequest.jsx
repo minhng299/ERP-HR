@@ -43,6 +43,7 @@ const CreateLeaveRequest = ({ onSuccess }) => {
       start_date: formData.start_date,
       end_date: formData.end_date,
       reason: formData.reason,
+      status: 'pending'
     };
 
     const token = getToken();

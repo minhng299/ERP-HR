@@ -43,6 +43,7 @@ class Employee(models.Model):
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=EMPLOYMENT_STATUS, default='active')
     profile_picture = models.URLField(blank=True)
+    annual_leave_remaining = models.IntegerField(default=12)
     ROLE_CHOICES = [
         ('manager', 'Manager'),
         ('employee', 'Employee'),

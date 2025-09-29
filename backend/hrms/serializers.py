@@ -81,7 +81,7 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeaveRequest
         fields = ['employee_id', 'leave_type', 'start_date', 'end_date', 'reason',
-                  'employee_name', 'leave_type_name', 'approved_by_name', 'days_requested', 'status']
+                  'employee_name', 'leave_type_name', 'approved_by_name', 'days_requested', 'status', 'id']
     
     def validate(self, data):
         if data['end_date'] < data['start_date']:
