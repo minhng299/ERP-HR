@@ -10,6 +10,8 @@ const LeaveManagement = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedRequest, setSelectedRequest] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,18 +35,34 @@ const LeaveManagement = () => {
   );
 
   const handleApprove = async (id) => {
-    await hrapi.approveLeaveRequest(id);
+    const token = getToken();
+    await hrapi.approveLeaveRequest(id, token);
     setLeaveRequests(prev =>
       prev.map(req => req.id === id ? { ...req, status: 'approved' } : req)
     );
   };
 
   const handleReject = async (id) => {
-    await hrapi.rejectLeaveRequest(id);
+    const token = getToken();
+    await hrapi.rejectLeaveRequest(id, token);
     setLeaveRequests(prev =>
       prev.map(req => req.id === id ? { ...req, status: 'rejected' } : req)
     );
   };
+
+  const handleCancel = async (id) => {
+    const token = getToken();
+    await hrapi.cancelLeaveRequest(id, token);
+    setLeaveRequests(prev =>
+      prev.map(req => req.id === id ? { ...req, status: 'cancelled' } : req)
+    );
+  };
+
+  const handleView = (request) => {
+    setSelectedRequest(request);
+    setShowDetail(true);         
+  };
+
 
   if (loading) return <div className="p-6">Loading data...</div>;
 
@@ -123,25 +141,56 @@ const LeaveManagement = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-sm font-medium">
-                  {user?.role === 'manager' && request.status === 'pending' && (
-                    <div className="flex space-x-2">
-                      <button onClick={() => handleApprove(request.id)} className="text-green-600 hover:text-green-900">
-                        <CheckCircle className="h-4 w-4" />
-                      </button>
-                      <button onClick={() => handleReject(request.id)} className="text-red-600 hover:text-red-900">
+                   <div className="flex space-x-2 items-center">
+                    {/* Ai cũng có thể xem */}
+                    <button onClick={() => handleView(request)} className="text-blue-600 hover:text-blue-900">
+                      <Eye className="h-4 w-4" />
+                    </button>
+
+                    {/* Manager: duyệt/từ chối nếu pending */}
+                    {user?.role === 'manager' && request.status === 'pending' && (
+                      <>
+                        <button onClick={() => handleApprove(request.id)} className="text-green-600 hover:text-green-900">
+                          <CheckCircle className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => handleReject(request.id)} className="text-red-600 hover:text-red-900">
+                          <XCircle className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
+
+                    {/* Employee: hủy nếu pending */}
+                    {user?.role === 'employee' && request.status === 'pending' && (
+                      <button onClick={() => handleCancel(request.id)} className="text-red-600 hover:text-red-900">
                         <XCircle className="h-4 w-4" />
                       </button>
-                    </div>
-                  )}
-                  <button className="text-blue-600 hover:text-blue-900 ml-2">
-                    <Eye className="h-4 w-4" />
-                  </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+            {showDetail && selectedRequest && (
+      <div className="absolute top-24 left-1/2 transform -translate-x-1/2 bg-white shadow-xl rounded-lg p-6 w-full max-w-xl z-50 border border-gray-200">
+        <h2 className="text-xl font-bold mb-4">Leave Details</h2>
+        <p><strong>Employee:</strong> {selectedRequest.employee_name}</p>
+        <p><strong>Type:</strong> {selectedRequest.leave_type_name}</p>
+        <p><strong>Duration:</strong> {new Date(selectedRequest.start_date).toLocaleDateString()} - {new Date(selectedRequest.end_date).toLocaleDateString()}</p>
+        <p><strong>Days:</strong> {selectedRequest.days_requested}</p>
+        <p><strong>Status:</strong> {selectedRequest.status}</p>
+        <p><strong>Reason:</strong> {selectedRequest.reason}</p>
+
+        <button onClick={() => setShowDetail(false)}
+        className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl"
+      >
+        ✖
+      </button>
+
+      </div>
+    )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
