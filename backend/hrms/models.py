@@ -104,7 +104,7 @@ class LeaveRequest(models.Model):
     end_date = models.DateField()
     days_requested = models.IntegerField(blank=True, null=True)
     reason = models.TextField()
-    status = models.CharField(max_length=20, choices=[('pending', 'Pending'), ('approved', 'Approved'), ('rejected', 'Rejected')])
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
     approved_by = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_leaves')
     request_date = models.DateTimeField(auto_now_add=True)
     response_date = models.DateTimeField(null=True, blank=True)
