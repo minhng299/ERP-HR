@@ -209,8 +209,8 @@ class Performance(models.Model):
         if self.pk:
             valid_transitions = {
                 'draft': ['submitted'],
-                'submitted': ['feedback', 'finalized'],  # manager có thể finalize hoặc chuyển sang feedback để employee phản hồi
-                'feedback': ['submitted'],               # manager chỉnh sửa lại sau khi employee feedback
+                'submitted': ['feedback'],  # manager có thể finalize hoặc chuyển sang feedback để employee phản hồi
+                'feedback': ['finalized'],               # manager chỉnh sửa lại sau khi employee feedback
                 'finalized': [],
             }
             prev_status = Performance.objects.get(pk=self.pk).status

@@ -150,14 +150,19 @@ class PerformanceSerializer(serializers.ModelSerializer):
             return instance
 
         if role == "manager":
-            for attr, value in validated_data.items():
-                setattr(instance, attr, value)
-            if request and request.method == "PUT":
-                try:
-                    instance.full_clean()
-                except ValidationError as e:
-                    raise serializers.ValidationError(e.message_dict or e.messages)
+            # Manager có thể chỉnh sửa mọi field khi draft/submitted
+            if instance.status in ["draft", "submitted"]:
+                for attr, value in validated_data.items():
+                    if attr != "status":
+                        setattr(instance, attr, value)
 
+            # Manager chỉ được finalize khi đang submitted hoặc feedback
+            if validated_data.get("status") == "finalized":
+                if instance.status != "feedback":
+                    raise serializers.ValidationError(
+                        {"status": ["Chỉ có thể finalize từ submitted hoặc feedback"]}
+                )
+            instance.status = "finalized"
             instance.save()
             return instance
         # Nếu role khác thì fallback
@@ -167,9 +172,9 @@ class PerformanceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         # auto gán reviewer nếu có user.employee
         if request and request.user.is_authenticated:
-            reviewer = getattr(request.user, "manager", None)
-            if reviewer:
-                attrs["reviewer"] = reviewer
+        # reviewer = chính employee (manager đang đăng nhập)
+            if "reviewer" not in attrs:
+                attrs["reviewer"] = request.user.employee
         # Chỉ validate toàn bộ khi POST hoặc PUT
         if request and request.method in ["POST", "PUT"]:
             instance = Performance(**attrs)
