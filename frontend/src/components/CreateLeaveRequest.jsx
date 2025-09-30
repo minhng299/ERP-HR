@@ -47,7 +47,6 @@ const CreateLeaveRequest = ({ onSuccess }) => {
     };
 
     const token = getToken();
-    console.log("Token đang dùng:", token);
     try {
       await hrapi.createLeaveRequest(payload, token);
       alert('Đã gửi đơn nghỉ thành công!');

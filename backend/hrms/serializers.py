@@ -1,10 +1,11 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.utils import timezone
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
 from django.core.exceptions import ValidationError
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, required=False)
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'password']
@@ -35,6 +36,23 @@ class EmployeeSerializer(serializers.ModelSerializer):
         employee = Employee.objects.create(user=user, **validated_data)
         return employee
 
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
+        # Update user fields if provided
+        if user_data:
+            user = instance.user
+            for attr, value in user_data.items():
+                if attr == 'password' and value:
+                    user.set_password(value)
+                elif value is not None:
+                    setattr(user, attr, value)
+            user.save()
+        # Update employee fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
+
     def get_manager_name(self, obj):
         if obj.manager:
             return f"{obj.manager.user.first_name} {obj.manager.user.last_name}"
@@ -55,24 +73,6 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         model = LeaveType
         fields = '__all__'
 
-# class LeaveRequestSerializer(serializers.ModelSerializer):
-#     employee_name = serializers.SerializerMethodField()
-#     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
-#     approved_by_name = serializers.SerializerMethodField()
-    
-#     class Meta:
-#         model = LeaveRequest
-#         fields = '__all__'
-    
-#     def get_employee_name(self, obj):
-#         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
-    
-#     def get_approved_by_name(self, obj):
-#         if obj.approved_by:
-#             return f"{obj.approved_by.user.first_name} {obj.approved_by.user.last_name}"
-#         return None
-# 
-# tranh ngay am
 class LeaveRequestSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)

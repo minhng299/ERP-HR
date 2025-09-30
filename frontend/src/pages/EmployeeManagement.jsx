@@ -7,7 +7,6 @@ import AddEmployeeModal from '../components/AddEmployeeModal';
 const EmployeeManagement = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  console.log("user",user.role)
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -95,7 +94,6 @@ const EmployeeManagement = () => {
         status: newEmployee.status,
         profile_picture: newEmployee.profile_picture,
       };
-      console.log('Adding employee with data:', data);
       const res = await hrapi.createEmployee(data);
       setEmployees(prev => [...prev, res.data]);
       setShowModal(false);
@@ -121,6 +119,16 @@ const EmployeeManagement = () => {
       setError('Failed to add employee');
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this employee?')) return;
+    try {
+      await hrapi.deleteEmployee(id);
+      setEmployees(prev => prev.filter(emp => emp.id !== id));
+    } catch (err) {
+      console.error('Failed to delete employee:', err);
     }
   };
 
@@ -252,7 +260,7 @@ const EmployeeManagement = () => {
                     <button className="text-green-600 hover:text-green-900">
                       <Edit className="h-4 w-4" />
                     </button>
-                    <button className="text-red-600 hover:text-red-900">
+                    <button className="text-red-600 hover:text-red-900" onClick={() => user.role === 'manager' && handleDelete(employee.id)} disabled={user.role !== 'manager'}>
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
