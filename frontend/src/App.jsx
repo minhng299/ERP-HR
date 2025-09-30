@@ -33,6 +33,7 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
+<<<<<<< HEAD
           <Route path="/login" element={<LoginForm />} />
           <Route path="/signup" element={<SignUpForm />} />
           <Route path="/*" element={
@@ -44,6 +45,19 @@ function App() {
             </PrivateRoute>
           } />
         </Routes>
+=======
+            <Route path="/login" element={<LoginForm />} />
+
+            <Route path="/*" element={
+              <PrivateRoute allowedRoles={["manager", "employee"]}>
+                <>
+                  <LogoutButton />
+                  <ERPHRSystem />
+                </>
+              </PrivateRoute>
+            } />
+          </Routes>
+>>>>>>> origin/main
       </Router>
     </AuthProvider>
   );

@@ -38,6 +38,7 @@ export const login = async (username, password) => {
 };
 
 export const hrapi = {
+  
   // Dashboard
   getDashboardStats: () => api.get('/employees/dashboard_stats/'),
 
@@ -63,11 +64,54 @@ export const hrapi = {
   updateAttendance: (id, data) => api.put(`/attendance/${id}/`, data),
 
   // Leave Requests
-  getLeaveRequests: () => api.get('/leave-requests/'),
-  createLeaveRequest: (data) => api.post('/leave-requests/', data),
-  approveLeaveRequest: (id) => api.post(`/leave-requests/${id}/approve/`),
-  rejectLeaveRequest: (id) => api.post(`/leave-requests/${id}/reject/`),
-  getLeaveTypes: () => api.get('/leave-types/'),
+  getLeaveRequests: (token) =>
+    api.get('/leave-requests/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+  createLeaveRequest: (data, token) =>
+    api.post('/leave-requests/', data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+  approveLeaveRequest: (id, token) =>
+    api.post(`/leave-requests/${id}/approve/`, {}, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+  rejectLeaveRequest: (id, token) =>
+    api.post(`/leave-requests/${id}/reject/`, {}, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+  
+    cancelLeaveRequest: (id, token) =>
+    api.post(`/leave-requests/${id}/cancel/`, {}, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
+
+    getLeaveStats: (token) =>
+    api.get('/leave-requests/stats/', {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+
+    // Leave Type
+  getLeaveTypes: (token) =>
+    api.get('/leave-types/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }),
 
   // Performance
   getPerformances: () => api.get('/performances/'),

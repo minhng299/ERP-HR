@@ -133,10 +133,12 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
     approved_by_name = serializers.SerializerMethodField()
+    days_requested = serializers.SerializerMethodField()
     
     class Meta:
         model = LeaveRequest
-        fields = '__all__'
+        fields = ['employee_id', 'leave_type', 'start_date', 'end_date', 'reason',
+                  'employee_name', 'leave_type_name', 'approved_by_name', 'days_requested', 'status', 'id']
     
     def validate(self, data):
         if data['end_date'] < data['start_date']:
@@ -145,6 +147,21 @@ class LeaveRequestSerializer(serializers.ModelSerializer):
     
     def get_employee_name(self, obj):
         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
+    
+    def create(self, validated_data):
+        user = self.context['request'].user
+        employee = user.employee  # nếu có quan hệ OneToOne giữa User và Employee
+        return LeaveRequest.objects.create(employee=employee, **validated_data)
+    
+    def update(self, instance, validated_data):
+        if validated_data.get('status') == 'cancelled' and instance.status == 'pending':
+            instance.status = 'cancelled'
+            instance.response_date = timezone.now()
+            instance.save()
+        return instance
+
+    def get_days_requested(self, obj):
+        return obj.days_requested
     
     def get_approved_by_name(self, obj):
         if obj.approved_by:
