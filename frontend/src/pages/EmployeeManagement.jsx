@@ -7,7 +7,6 @@ import AddEmployeeModal from '../components/AddEmployeeModal';
 const EmployeeManagement = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  console.log("user",user.role)
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [positions, setPositions] = useState([]);
@@ -95,7 +94,6 @@ const EmployeeManagement = () => {
         status: newEmployee.status,
         profile_picture: newEmployee.profile_picture,
       };
-      console.log('Adding employee with data:', data);
       const res = await hrapi.createEmployee(data);
       setEmployees(prev => [...prev, res.data]);
       setShowModal(false);
