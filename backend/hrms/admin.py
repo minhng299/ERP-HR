@@ -26,12 +26,12 @@ class AttendanceAdmin(admin.ModelAdmin):
 
 @admin.register(LeaveType)
 class LeaveTypeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'days_allowed']
+    list_display = ['name', 'max_days_per_year', 'is_paid']
 
 @admin.register(LeaveRequest)
 class LeaveRequestAdmin(admin.ModelAdmin):
-    list_display = ['employee', 'leave_type', 'start_date', 'end_date', 'status', 'request_date']
-    list_filter = ['status', 'leave_type', 'start_date']
+    list_display = ['employee_id', 'leave_type_id', 'start_date', 'end_date', 'status', 'request_date']
+    list_filter = ['status', 'leave_type_id', 'start_date']
     date_hierarchy = 'request_date'
 
 @admin.register(Performance)
