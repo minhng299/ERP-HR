@@ -2,6 +2,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
+from django.utils.text import slugify
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
 
 
 class Department(models.Model):
@@ -42,6 +45,7 @@ class Employee(models.Model):
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=EMPLOYMENT_STATUS, default='active')
     profile_picture = models.URLField(blank=True)
+    annual_leave_remaining = models.IntegerField(default=12)
     ROLE_CHOICES = [
         ('manager', 'Manager'),
         ('employee', 'Employee'),
@@ -73,36 +77,60 @@ class Attendance(models.Model):
         super().save(*args, **kwargs)
 
 class LeaveType(models.Model):
-    name = models.CharField(max_length=50)
-    days_allowed = models.IntegerField()
+    name = models.CharField(max_length=50, unique=True)
+    code = models.CharField(max_length=10, unique=True, blank=True, null=True)
+    # days_allowed = models.IntegerField()
     description = models.TextField(blank=True)
+    max_days_per_year = models.IntegerField(default=12)
+    is_paid = models.BooleanField(default=True)
     
     def __str__(self):
         return self.name
+    
+@receiver(pre_save, sender=LeaveType)
+def generate_code(sender, instance, **kwargs):
+        if not instance.code:
+            instance.code = slugify(instance.name)[:10].upper()
 
 class LeaveRequest(models.Model):
     STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('approved', 'Approved'),
         ('rejected', 'Rejected'),
+        ('cancelled', 'Cancelled'),
     ]
-    
+
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     leave_type = models.ForeignKey(LeaveType, on_delete=models.CASCADE)
     start_date = models.DateField()
     end_date = models.DateField()
-    days_requested = models.IntegerField()
+    days_requested = models.IntegerField(blank=True, null=True)
     reason = models.TextField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES)
     approved_by = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_leaves')
     request_date = models.DateTimeField(auto_now_add=True)
     response_date = models.DateTimeField(null=True, blank=True)
     comments = models.TextField(blank=True)
-    
-    def save(self, *args, **kwargs):
+
+    def clean(self):
+        if self.start_date > self.end_date:
+            raise ValidationError("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.")
         if not self.days_requested:
             self.days_requested = (self.end_date - self.start_date).days + 1
+        if self.status == 'approved' and self.days_requested > self.employee.annual_leave_remaining:
+            raise ValidationError("Không đủ số ngày nghỉ còn lại.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        if self.status == 'approved' and self.response_date and self.approved_by:
+            if self.leave_type.code == 'AL':  # Annual Leave
+                self.employee.annual_leave_remaining -= self.days_requested
+                self.employee.save()
         super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.employee} - {self.leave_type.name} ({self.status})"
+
 
 class Performance(models.Model):
     RATING_CHOICES = [
