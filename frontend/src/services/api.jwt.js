@@ -43,6 +43,7 @@ export const hrapi = {
   getDashboardStats: () => api.get('/employees/dashboard_stats/'),
 
   // Employees
+  
   getEmployees: () => api.get('/employees/'),
   getEmployee: (id) => api.get(`/employees/${id}/`),
   createEmployee: (data) => api.post('/employees/', data),
@@ -120,6 +121,20 @@ export const hrapi = {
   // Payroll
   getMySalary: () => api.get('/payroll/my-salary/'),
   setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
+  getPerformances: () => api.get('/performances/'),                     
+  getPerformance: (id) => api.get(`/performances/${id}/`),              
+  createPerformance: (data) => api.post('/performances/', data),        
+  updatePerformance: (id, data) => api.patch(`/performances/${id}/`, data), 
+  deletePerformance: (id) => api.delete(`/performances/${id}/`),        
+
+  getMyReviews: () => api.get('/performances/my_reviews/'),            
+  getPerformancesByStatus: (status) => api.get(`/performances/by_status/?status=${status}`), 
+  getPerformanceAnalytics: () => api.get('/performances/analytics/'),  
+  getReviewHistory: (id) => api.get(`/performances/${id}/review_history/`), 
+  exportPerformancePDF: (id) => api.get(`/performances/${id}/export_pdf/`, { responseType: 'blob' }),
+
+  updateReviewStatus: (id, status) => api.patch(`/performances/${id}/update_status/`, { status }),
+  submitEmployeeFeedback: (id, feedback) => api.post(`/performances/${id}/feedback/`, { feedback }),
 };
 
 export default api;

@@ -1,9 +1,11 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
+from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+
 
 class Department(models.Model):
     name = models.CharField(max_length=100)
@@ -143,9 +145,16 @@ class Performance(models.Model):
         (4, 'Above Average'),
         (5, 'Excellent'),
     ]
-    
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    reviewer = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name='reviewed_performances')
+
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('submitted', 'Submitted'),
+        ('feedback', 'Feedback'),
+        ('finalized', 'Finalized'),
+    ]
+
+    employee = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='performance_reviews')
+    reviewer = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='reviewed_performances')
     review_period_start = models.DateField()
     review_period_end = models.DateField()
     overall_rating = models.IntegerField(choices=RATING_CHOICES)
@@ -155,4 +164,61 @@ class Performance(models.Model):
     initiative = models.IntegerField(choices=RATING_CHOICES)
     comments = models.TextField()
     employee_comments = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Performance Review: {self.employee.user.get_full_name()} by {self.reviewer.user.get_full_name()} ({self.review_period_start} - {self.review_period_end}) - Status: {self.status}"
+
+    def clean(self):
+        # 1. Ngày bắt đầu < ngày kết thúc
+        if self.review_period_start >= self.review_period_end:
+            raise ValidationError("Review period start date must be before the end date.")
+
+        # 2. Reviewer không được là chính employee
+        if self.reviewer == self.employee:
+            raise ValidationError("Reviewer cannot review themselves.")
+
+        # 3. Reviewer phải là Manager
+        if self.reviewer.role.lower() != 'manager':
+            raise ValidationError("Reviewer must be a Manager.")
+
+        # 4. Reviewer và employee phải cùng department
+        if self.reviewer.department != self.employee.department:
+            raise ValidationError("Reviewer and employee must belong to the same department.")
+
+        # 5. Reviewer không được review cùng employee nhiều hơn 1 lần/tháng
+        month_start = self.review_period_start.replace(day=1)
+        if self.review_period_start.month == 12:
+            next_month_start = self.review_period_start.replace(year=self.review_period_start.year + 1, month=1, day=1)
+        else:
+            next_month_start = self.review_period_start.replace(month=self.review_period_start.month + 1, day=1)
+
+        overlapping_reviews = Performance.objects.filter(
+            employee=self.employee,
+            reviewer=self.reviewer,
+            review_period_start__gte=month_start,
+            review_period_start__lt=next_month_start,
+        )
+        if self.pk:
+            overlapping_reviews = overlapping_reviews.exclude(pk=self.pk)
+
+        if overlapping_reviews.exists():
+            raise ValidationError("This reviewer has already reviewed this employee in the same month.")
+
+        # 6. Check status transition nếu update
+        if self.pk:
+            valid_transitions = {
+                'draft': ['submitted'],
+                'submitted': ['feedback', 'finalized'],  # manager có thể finalize hoặc chuyển sang feedback để employee phản hồi
+                'feedback': ['submitted'],               # manager chỉnh sửa lại sau khi employee feedback
+                'finalized': [],
+            }
+            prev_status = Performance.objects.get(pk=self.pk).status
+            new_status = self.status
+            if new_status not in valid_transitions[prev_status]:
+                raise ValidationError(f"Invalid status transition from {prev_status} to {new_status}.")
