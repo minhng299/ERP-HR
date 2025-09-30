@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.utils import timezone
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
 from django.core.exceptions import ValidationError
 
@@ -72,24 +73,6 @@ class LeaveTypeSerializer(serializers.ModelSerializer):
         model = LeaveType
         fields = '__all__'
 
-# class LeaveRequestSerializer(serializers.ModelSerializer):
-#     employee_name = serializers.SerializerMethodField()
-#     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
-#     approved_by_name = serializers.SerializerMethodField()
-    
-#     class Meta:
-#         model = LeaveRequest
-#         fields = '__all__'
-    
-#     def get_employee_name(self, obj):
-#         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
-    
-#     def get_approved_by_name(self, obj):
-#         if obj.approved_by:
-#             return f"{obj.approved_by.user.first_name} {obj.approved_by.user.last_name}"
-#         return None
-# 
-# tranh ngay am
 class LeaveRequestSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
     leave_type_name = serializers.CharField(source='leave_type.name', read_only=True)
