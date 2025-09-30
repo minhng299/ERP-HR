@@ -124,6 +124,16 @@ const EmployeeManagement = () => {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this employee?')) return;
+    try {
+      await hrapi.deleteEmployee(id);
+      setEmployees(prev => prev.filter(emp => emp.id !== id));
+    } catch (err) {
+      console.error('Failed to delete employee:', err);
+    }
+  };
+
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = emp.user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          emp.user.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -252,7 +262,7 @@ const EmployeeManagement = () => {
                     <button className="text-green-600 hover:text-green-900">
                       <Edit className="h-4 w-4" />
                     </button>
-                    <button className="text-red-600 hover:text-red-900">
+                    <button className="text-red-600 hover:text-red-900" onClick={() => user.role === 'manager' && handleDelete(employee.id)} disabled={user.role !== 'manager'}>
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>

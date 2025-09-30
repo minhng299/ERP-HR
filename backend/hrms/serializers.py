@@ -4,7 +4,7 @@ from .models import Employee, Department, Position, Attendance, LeaveRequest, Le
 from django.core.exceptions import ValidationError
 
 class UserSerializer(serializers.ModelSerializer):
-    password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, required=False)
     class Meta:
         model = User
         fields = ['id', 'username', 'first_name', 'last_name', 'email', 'password']
@@ -34,6 +34,23 @@ class EmployeeSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**user_data)
         employee = Employee.objects.create(user=user, **validated_data)
         return employee
+
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
+        # Update user fields if provided
+        if user_data:
+            user = instance.user
+            for attr, value in user_data.items():
+                if attr == 'password' and value:
+                    user.set_password(value)
+                elif value is not None:
+                    setattr(user, attr, value)
+            user.save()
+        # Update employee fields
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+        return instance
 
     def get_manager_name(self, obj):
         if obj.manager:

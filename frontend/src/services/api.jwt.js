@@ -47,7 +47,7 @@ export const hrapi = {
   getEmployees: () => api.get('/employees/'),
   getEmployee: (id) => api.get(`/employees/${id}/`),
   createEmployee: (data) => api.post('/employees/', data),
-  updateEmployee: (id, data) => api.put(`/employees/${id}/`, data),
+  updateEmployee: (id, data) => api.patch(`/employees/${id}/`, data),
   deleteEmployee: (id) => api.delete(`/employees/${id}/`),
 
   // Departments
