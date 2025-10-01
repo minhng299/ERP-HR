@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getToken, hrapi } from '../services/api.jwt';
+import { getAccessToken, hrapi, logout } from '../services/api.jwt';
 
 const AuthContext = createContext();
 
@@ -8,26 +8,55 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (getToken()) {
-        try {
-          // Fetch current employee info
-          const res = await hrapi.getEmployee('me');
-          console.log("employye",res)
-          setUser(res.data);
-        } catch {
-          setUser(null);
+  const fetchUser = async () => {
+    if (getAccessToken()) {
+      try {
+        setError(null);
+        const res = await hrapi.getEmployee('me');
+        setUser(res.data);
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+        setError('Failed to authenticate user');
+        setUser(null);
+        
+        // If authentication fails completely, logout
+        if (error.response?.status === 401) {
+          logout();
         }
       }
-      setLoading(false);
-    };
+    } else {
+      setUser(null);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchUser();
   }, []);
 
+  // Expose refreshUser and setLoading for login flow
+  const refreshUser = async () => {
+    setLoading(true);
+    await fetchUser();
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setError(null);
+    logout();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      error, 
+      setLoading, 
+      refreshUser, 
+      logout: handleLogout 
+    }}>
       {children}
     </AuthContext.Provider>
   );

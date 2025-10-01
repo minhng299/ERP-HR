@@ -1,7 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
-import ERPHRSystem from './components/ERPHRSystem';
+import ERPHRSystem from './pages/ERPHRSystem';
+import EmployeeDetail from './pages/EmployeeDetail';
 import { removeToken } from './services/api.jwt';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './index.css';
@@ -31,16 +32,17 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/" element={
-            <PrivateRoute allowedRoles={["manager", "employee"]}>
-              <>
-                <LogoutButton />
-                <ERPHRSystem />
-              </>
-            </PrivateRoute>
-          } />
-        </Routes>
+            <Route path="/login" element={<LoginForm />} />
+
+            <Route path="/*" element={
+              <PrivateRoute allowedRoles={["manager", "employee"]}>
+                <>
+                  <LogoutButton />
+                  <ERPHRSystem />
+                </>
+              </PrivateRoute>
+            } />
+          </Routes>
       </Router>
     </AuthProvider>
   );

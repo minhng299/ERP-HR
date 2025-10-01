@@ -1,6 +1,6 @@
 from django.contrib import admin
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
-# ấu hình các model hiển thị trong Django Admin.
+
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
     list_display = ['name', 'description', 'created_at']
@@ -26,15 +26,30 @@ class AttendanceAdmin(admin.ModelAdmin):
 
 @admin.register(LeaveType)
 class LeaveTypeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'days_allowed']
+    list_display = ['name', 'max_days_per_year', 'is_paid']
 
 @admin.register(LeaveRequest)
 class LeaveRequestAdmin(admin.ModelAdmin):
-    list_display = ['employee', 'leave_type', 'start_date', 'end_date', 'status', 'request_date']
-    list_filter = ['status', 'leave_type', 'start_date']
+    list_display = ['employee_id', 'leave_type_id', 'start_date', 'end_date', 'status', 'request_date']
+    list_filter = ['status', 'leave_type_id', 'start_date']
     date_hierarchy = 'request_date'
 
 @admin.register(Performance)
 class PerformanceAdmin(admin.ModelAdmin):
-    list_display = ['employee', 'reviewer', 'overall_rating', 'review_period_start', 'review_period_end']
-    list_filter = ['overall_rating', 'review_period_start']
+    list_display = [
+        'employee', 
+        'reviewer', 
+        'review_period_start', 
+        'review_period_end', 
+        'overall_rating', 
+        'status',
+        'created_at'
+    ]
+    list_filter = ['status', 'reviewer', 'review_period_start']
+    search_fields = [
+        'employee__user__first_name', 
+        'employee__user__last_name', 
+        'reviewer__user__first_name', 
+        'reviewer__user__last_name'
+    ]
+    date_hierarchy = 'created_at'
