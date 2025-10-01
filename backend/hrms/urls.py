@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import (
     EmployeeViewSet, DepartmentViewSet, PositionViewSet,
     AttendanceViewSet, LeaveRequestViewSet, LeaveTypeViewSet,
-    PerformanceViewSet
+    PerformanceViewSet, change_password, SignUpView
 )
 
 router = DefaultRouter()
@@ -17,4 +17,5 @@ router.register(r'performances', PerformanceViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('auth/change-password/', change_password, name='change_password'),
 ]

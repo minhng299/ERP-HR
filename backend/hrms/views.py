@@ -1,11 +1,13 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from django.db.models import Count, Avg, Q
 from django.utils.timezone import now
 from django.shortcuts import render
 from .models import LeaveType
 from django.db.models import Count, Avg
+from django.contrib.auth import authenticate
+from rest_framework.permissions import IsAuthenticated
 
 from django.utils import timezone
 from datetime import timedelta
@@ -13,8 +15,23 @@ from .models import Employee, Department, Position, Attendance, LeaveRequest, Le
 from .serializers import (
     EmployeeSerializer, DepartmentSerializer, PositionSerializer,
     AttendanceSerializer, LeaveRequestSerializer, LeaveTypeSerializer,
-    PerformanceSerializer
+    PerformanceSerializer, SignUpSerializer
 )
+from rest_framework.views import APIView
+from django.contrib.auth import authenticate
+class SignUpView(APIView):
+    permission_classes = []  # Allow any
+
+    def post(self, request):
+        serializer = SignUpSerializer(data=request.data)
+        if serializer.is_valid():
+            employee = serializer.save()
+            return Response({
+                "message": "User registered successfully.",
+                "employee_id": employee.id,
+                "username": employee.user.username
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 from .permissions import IsManagerOrReadOnly, IsEmployee
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
@@ -39,11 +56,43 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated, IsManagerOrReadOnly]
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get', 'patch'], permission_classes=[IsAuthenticated])
     def me(self, request):
-        employee = Employee.objects.get(user=request.user)
-        serializer = self.get_serializer(employee)
-        return Response(serializer.data)
+        try:
+            employee = Employee.objects.get(user=request.user)
+        except Employee.DoesNotExist:
+            return Response({'error': 'Employee profile not found'}, status=status.HTTP_404_NOT_FOUND)
+        
+        if request.method == 'GET':
+            # Return current user's profile
+            serializer = self.get_serializer(employee)
+            return Response(serializer.data)
+        
+        elif request.method == 'PATCH':
+            # Update current user's profile - allows users to update their own profile
+            # Only allow updating specific fields for self-update
+            allowed_fields = ['phone_number', 'address', 'date_of_birth']
+            user_allowed_fields = ['first_name', 'last_name', 'email']
+            
+            # Update employee fields
+            for field in allowed_fields:
+                if field in request.data:
+                    setattr(employee, field, request.data[field])
+            
+            # Update user fields
+            user_data = {}
+            for field in user_allowed_fields:
+                if field in request.data:
+                    user_data[field] = request.data[field]
+            
+            if user_data:
+                for field, value in user_data.items():
+                    setattr(employee.user, field, value)
+                employee.user.save()
+            
+            employee.save()
+            serializer = self.get_serializer(employee)
+            return Response(serializer.data)
     
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def dashboard_stats(self, request):
@@ -461,3 +510,38 @@ class PerformanceViewSet(viewsets.ModelViewSet):
         p.showPage()
         p.save()
         return response
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """Change user password"""
+    user = request.user
+    current_password = request.data.get('current_password')
+    new_password = request.data.get('new_password')
+    
+    if not current_password or not new_password:
+        return Response(
+            {'error': 'Both current_password and new_password are required'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Verify current password
+    if not authenticate(username=user.username, password=current_password):
+        return Response(
+            {'error': 'Current password is incorrect'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Validate new password
+    if len(new_password) < 8:
+        return Response(
+            {'error': 'New password must be at least 8 characters long'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Set new password
+    user.set_password(new_password)
+    user.save()
+    
+    return Response({'message': 'Password changed successfully'}, status=status.HTTP_200_OK)

@@ -12,3 +12,4 @@ debug.log
 .vscode
 serviceAccountKey.json
 /client-sites
+/.github/*

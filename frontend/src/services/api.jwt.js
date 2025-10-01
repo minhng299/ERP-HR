@@ -184,6 +184,12 @@ export const hrapi = {
     }),
 
   // Performance
+  getPerformances: () => api.get('/performances/'),
+  createPerformance: (data) => api.post('/performances/', data),
+
+  // Payroll
+  getMySalary: () => api.get('/payroll/my-salary/'),
+  setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
   getPerformances: () => api.get('/performances/'),                     
   getPerformance: (id) => api.get(`/performances/${id}/`),              
   createPerformance: (data) => api.post('/performances/', data),        
@@ -198,6 +204,17 @@ export const hrapi = {
 
   updateReviewStatus: (id, status) => api.patch(`/performances/${id}/update_status/`, { status }),
   submitEmployeeFeedback: (id, feedback) => api.post(`/performances/${id}/feedback/`, { feedback }),
+
+  // Profile Management
+  updateMyProfile: (data) => api.patch('/employees/me/', data), // For users to update their own profile
+  updateEmployeeProfile: (id, data) => api.patch(`/employees/${id}/`, data), // For managers to update employee data
+  changePassword: (data) => api.post('/auth/change-password/', data),
+  getCurrentUser: () => api.get('/employees/me/'),
+  uploadProfilePicture: (formData) => api.patch('/employees/me/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
 };
 
 export default api;
