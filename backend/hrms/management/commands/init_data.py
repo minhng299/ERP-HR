@@ -33,10 +33,10 @@ class Command(BaseCommand):
 
         # Create leave types
         leave_types = [
-            {'name': 'Annual Leave', 'days_allowed': 25, 'description': 'Yearly vacation days'},
-            {'name': 'Sick Leave', 'days_allowed': 10, 'description': 'Medical leave'},
-            {'name': 'Personal Leave', 'days_allowed': 5, 'description': 'Personal time off'},
-            {'name': 'Maternity Leave', 'days_allowed': 90, 'description': 'Maternity leave'},
+            {'name': 'Annual Leave', 'max_days_per_year': 25, 'description': 'Yearly vacation days'},
+            {'name': 'Sick Leave', 'max_days_per_year': 10, 'description': 'Medical leave'},
+            {'name': 'Personal Leave', 'max_days_per_year': 5, 'description': 'Personal time off'},
+            {'name': 'Maternity Leave', 'max_days_per_year': 90, 'description': 'Maternity leave'},
         ]
         for leave_data in leave_types:
             LeaveType.objects.get_or_create(**leave_data)
