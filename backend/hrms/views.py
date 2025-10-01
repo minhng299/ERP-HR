@@ -228,6 +228,63 @@ def my_attendance(self, request):
             'error': 'Employee profile not found'
         }, status=status.HTTP_404_NOT_FOUND)
 
+@action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrReadOnly])
+def department_attendance(self, request):
+    """Manager xem chấm công của phòng ban"""
+    try:
+        manager = request.user.employee
+        
+        # Kiểm tra user có phải manager không
+        if manager.role != 'manager':
+            return Response({
+                'error': 'Chỉ manager mới có quyền truy cập'
+            }, status=status.HTTP_403_FORBIDDEN)
+            
+        target_date = request.query_params.get('date', timezone.now().date())
+        
+        # Lấy tất cả nhân viên trong phòng ban
+        department_employees = Employee.objects.filter(
+            department=manager.department,
+            status='active'
+        )
+        
+        # Lấy chấm công trong ngày
+        attendance_records = Attendance.objects.filter(
+            employee__in=department_employees,
+            date=target_date
+        ).select_related('employee__user')
+        
+        # Tạo danh sách đầy đủ
+        result = []
+        for employee in department_employees:
+            record = attendance_records.filter(employee=employee).first()
+            if record:
+                serializer = AttendanceSerializer(record)
+                attendance_data = serializer.data
+                attendance_data['employee_name'] = f"{employee.user.first_name} {employee.user.last_name}"
+                attendance_data['status'] = 'present' if record.check_in else 'absent'
+                result.append(attendance_data)
+            else:
+                result.append({
+                    'employee': employee.id,
+                    'employee_name': f"{employee.user.first_name} {employee.user.last_name}",
+                    'date': target_date,
+                    'check_in': None,
+                    'check_out': None,
+                    'status': 'absent'
+                })
+        
+        return Response({
+            'date': target_date,
+            'department': manager.department.name,
+            'attendance': result
+        })
+        
+    except Employee.DoesNotExist:
+        return Response({
+            'error': 'Employee profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
+
     # GIỮ NGUYÊN CÁC METHODS KHÁC CỦA BẠN
     @action(detail=False, methods=['get'])
     def today(self, request):
