@@ -19,4 +19,6 @@ urlpatterns = [
     path('', include(router.urls)),
     path('signup/', SignUpView.as_view(), name='signup'),
     path('payroll/', include('payroll.urls')),
+    path('auth/change-password/', change_password, name='change_password'),
+    path('api/payroll/', include('payroll.urls')),
 ]
