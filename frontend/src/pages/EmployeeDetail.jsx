@@ -38,10 +38,31 @@ const EmployeeDetail = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
     setError('');
+    // Build updateData, only include 'user' if user info is being edited
+    const updateData = {
+      employee_id: employee.employee_id,
+      phone_number: employee.phone_number,
+      address: employee.address,
+      date_of_birth: employee.date_of_birth,
+      hire_date: employee.hire_date,
+      department: employee.department,
+      position: employee.position,
+      manager: employee.manager,
+      profile_picture: employee.profile_picture,
+      ...form,
+    };
+    // If form.user exists and has any keys, include user in payload
+    if (form.user && Object.keys(form.user).length > 0) {
+      updateData.user = {
+        first_name: employee.user.first_name,
+        last_name: employee.user.last_name,
+        email: employee.user.email,
+        ...form.user,
+      };
+    }
     try {
-      await hrapi.updateEmployee(id, form);
+      await hrapi.updateEmployee(id, updateData);
       setEditing(false);
-      navigate(0); // reload page
     } catch (err) {
       setError('Failed to update employee');
     }

@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { getToken, hrapi } from '../services/api.jwt';
+import { getAccessToken, hrapi, logout } from '../services/api.jwt';
 
 const AuthContext = createContext();
 
@@ -8,15 +8,26 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const fetchUser = async () => {
-    if (getToken()) {
+    if (getAccessToken()) {
       try {
+        setError(null);
         const res = await hrapi.getEmployee('me');
         setUser(res.data);
-      } catch {
+      } catch (error) {
+        console.error('Failed to fetch user:', error);
+        setError('Failed to authenticate user');
         setUser(null);
+        
+        // If authentication fails completely, logout
+        if (error.response?.status === 401) {
+          logout();
+        }
       }
+    } else {
+      setUser(null);
     }
     setLoading(false);
   };
@@ -31,8 +42,21 @@ export const AuthProvider = ({ children }) => {
     await fetchUser();
   };
 
+  const handleLogout = () => {
+    setUser(null);
+    setError(null);
+    logout();
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, setLoading, refreshUser }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      loading, 
+      error, 
+      setLoading, 
+      refreshUser, 
+      logout: handleLogout 
+    }}>
       {children}
     </AuthContext.Provider>
   );
