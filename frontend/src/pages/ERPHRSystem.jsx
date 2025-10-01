@@ -1,46 +1,36 @@
-import { Users, Calendar, FileText, TrendingUp, DollarSign, Edit } from 'lucide-react';
-import Salary from './Salary';
-import SetSalary from './SetSalary';
-import { useAuth } from '../contexts/AuthContext';
 import React, { useState } from 'react';
-import { Users, Calendar, FileText, TrendingUp, BarChart3, Home, Clock, Award } from 'lucide-react';
+import { Link, Routes, Route, useLocation } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { Users, Calendar, FileText, TrendingUp, DollarSign, Edit, BarChart3, Home, Clock, Award } from 'lucide-react';
+
 import Dashboard from './Dashboard';
 import EmployeeManagement from './EmployeeManagement';
 import AttendanceManagement from './AttendanceManagement';
 import LeaveManagement from './LeaveManagement';
 import PerformanceManagement from './PerformanceManagement';
 import EmployeeDetail from './EmployeeDetail';
+import Salary from './Salary';
+import SetSalary from './SetSalary';
 import UserProfile from './UserProfile';
 import Header from '../components/Header';
-import { Link, Routes, Route, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-
-// Main App Component
 
 const baseTabs = [
-  { id: 'dashboard', name: 'Dashboard', icon: TrendingUp, path: '/dashboard' },
-  { id: 'employees', name: 'Employees', icon: Users, path: '/employees' },
-  { id: 'attendance', name: 'Attendance', icon: Calendar, path: '/attendance' },
-  { id: 'leave', name: 'Leave Management', icon: FileText, path: '/leave' },
-  { id: 'performance', name: 'Performance', icon: TrendingUp, path: '/performance' },
-  { id: 'salary', name: 'Salary', icon: DollarSign, path: '/salary' },
-// Navigation tabs configuration
-const tabs = [
   { id: 'dashboard', name: 'Dashboard', icon: Home, path: '/dashboard', color: 'text-blue-600' },
   { id: 'employees', name: 'Employees', icon: Users, path: '/employees', color: 'text-green-600' },
   { id: 'attendance', name: 'Attendance', icon: Clock, path: '/attendance', color: 'text-purple-600' },
   { id: 'leave', name: 'Leave Management', icon: Calendar, path: '/leave', color: 'text-orange-600' },
   { id: 'performance', name: 'Performance', icon: Award, path: '/performance', color: 'text-red-600' },
+  { id: 'salary', name: 'Salary', icon: DollarSign, path: '/salary', color: 'text-yellow-600' },
 ];
 
 const ERPHRSystem = () => {
   const location = useLocation();
   const { user } = useAuth();
-  const tabs = user && user.role === 'manager'
-    ? [...baseTabs, { id: 'set-salary', name: 'Set Salary', icon: Edit, path: '/set-salary' }]
-    : baseTabs;
-  const { user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  const tabs = user && user.role === 'manager'
+    ? [...baseTabs, { id: 'set-salary', name: 'Set Salary', icon: Edit, path: '/set-salary', color: 'text-indigo-600' }]
+    : baseTabs;
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -52,46 +42,10 @@ const ERPHRSystem = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-100">
-      {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold text-gray-800">ERP HR System</h1>
-        </div>
-        <nav className="mt-6">
-          {tabs.map((tab) => (
-            <Link
-              key={tab.id}
-              to={tab.path}
-              className={`w-full flex items-center px-6 py-3 text-left hover:bg-gray-50 ${
-                location.pathname.startsWith(tab.path) ? 'bg-blue-50 border-r-2 border-blue-500 text-blue-600' : 'text-gray-700'
-              }`}
-            >
-              <tab.icon className="h-5 w-5 mr-3" />
-              {tab.name}
-            </Link>
-          ))}
-        </nav>
-      </div>
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
-        <Routes>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/employees" element={<EmployeeManagement />} />
-          <Route path="/attendance" element={<AttendanceManagement />} />
-          <Route path="/leave" element={<LeaveManagement />} />
-          <Route path="/performance" element={<PerformanceManagement />} />
-          <Route path="/salary" element={<Salary />} />
-          {user && user.role === 'manager' && (
-            <Route path="/set-salary" element={<SetSalary />} />
-          )}
-          <Route path="/employees/:id" element={<EmployeeDetail />} />
-          <Route path="/" element={<Dashboard />} />
-        </Routes>
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Header */}
       <Header onMenuToggle={toggleSidebar} isMenuOpen={isSidebarOpen} />
-      
+
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
         <aside className={`
@@ -126,8 +80,7 @@ const ERPHRSystem = () => {
                     group flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200
                     ${isActive 
                       ? 'bg-blue-50 text-blue-700 border-r-2 border-blue-600' 
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                    }
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
                   `}
                 >
                   <tab.icon className={`
@@ -135,9 +88,7 @@ const ERPHRSystem = () => {
                     ${isActive ? tab.color : 'text-gray-400 group-hover:text-gray-500'}
                   `} />
                   <span className="truncate">{tab.name}</span>
-                  {isActive && (
-                    <div className="ml-auto w-2 h-2 bg-blue-600 rounded-full animate-pulse" />
-                  )}
+                  {isActive && <div className="ml-auto w-2 h-2 bg-blue-600 rounded-full animate-pulse" />}
                 </Link>
               );
             })}
@@ -178,6 +129,10 @@ const ERPHRSystem = () => {
               <Route path="/attendance" element={<AttendanceManagement />} />
               <Route path="/leave" element={<LeaveManagement />} />
               <Route path="/performance" element={<PerformanceManagement />} />
+              <Route path="/salary" element={<Salary />} />
+              {user && user.role === 'manager' && (
+                <Route path="/set-salary" element={<SetSalary />} />
+              )}
               <Route path="/employees/:id" element={<EmployeeDetail />} />
               <Route path="/profile" element={<UserProfile />} />
               <Route path="/" element={<Dashboard />} />
