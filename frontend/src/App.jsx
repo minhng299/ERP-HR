@@ -32,6 +32,7 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
+            <Route path="/signup" element={<SignUpForm />} />
             <Route path="/login" element={<LoginForm />} />
 
             <Route path="/*" element={
@@ -43,6 +44,7 @@ function App() {
               </PrivateRoute>
             } />
           </Routes>
+
       </Router>
     </AuthProvider>
   );

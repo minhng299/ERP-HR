@@ -34,7 +34,7 @@ from rest_framework.permissions import IsAuthenticated
 from hrms.models import Employee
 from .models import SalaryRecord
 from .services import PayrollService
-from datetime import date
+from datetime import date, timedelta
 
 class MySalaryView(APIView):
     permission_classes = [IsAuthenticated]
@@ -45,16 +45,24 @@ class MySalaryView(APIView):
             employee = Employee.objects.get(user=user)
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
+        ##chú ý
         today = date.today()
+        # today = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+
         # Tính lại lương dựa trên số ngày nghỉ/thưởng, update vào SalaryRecord tháng hiện tại
         from payroll.services import PayrollService
-        # (bonus mặc định = 0, có thể mở rộng sau)
         base_salary = employee.salary
         bonus = 0
         penalty_per_day = 100000
-        late_days, absent_days = PayrollService.get_late_or_absent_days(employee, today)
+        late_days, absent_days, num_days = PayrollService.get_late_or_absent_days(employee, today)
         deductions = (late_days + absent_days) * penalty_per_day
-        total_salary = base_salary + bonus - deductions
+        # Nếu là nhân viên mới, chia lương theo số ngày làm thực tế
+        if num_days < 28:
+            daily_salary = float(base_salary) / 28
+            base_salary_calc = daily_salary * num_days
+        else:
+            base_salary_calc = float(base_salary)
+        total_salary = base_salary_calc + bonus - deductions
         # Update hoặc tạo mới SalaryRecord tháng này
         from payroll.models import SalaryRecord
         month = today.replace(day=1)
