@@ -5,13 +5,8 @@ import { hrapi } from "../../services/api.jwt";
 const EditReviewModal = ({ isOpen, onClose, review, onUpdated, role }) => {
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
-  const ratingFields = [
-    "overall_rating",
-    "goals_achievement",
-    "communication",
-    "teamwork",
-    "initiative",
-  ];
+  // Loại bỏ overall_rating vì backend tự tính
+  const ratingFields = ["goals_achievement", "communication", "teamwork", "initiative"];
 
   useEffect(() => {
     if (!review) return;
@@ -20,7 +15,6 @@ const EditReviewModal = ({ isOpen, onClose, review, onUpdated, role }) => {
       employee: review.employee?.id ?? review.employee ?? null,
       review_period_start: review.review_period_start ?? "",
       review_period_end: review.review_period_end ?? "",
-      overall_rating: review.overall_rating ?? "",
       goals_achievement: review.goals_achievement ?? "",
       communication: review.communication ?? "",
       teamwork: review.teamwork ?? "",
@@ -49,7 +43,8 @@ const EditReviewModal = ({ isOpen, onClose, review, onUpdated, role }) => {
     e.preventDefault();
     if (!review?.id) return;
     try {
-      const res = await hrapi.updatePerformance(review.id, formData);
+      const { status, ...payload } = formData;
+      const res = await hrapi.updatePerformance(review.id, payload);
       if (onUpdated) onUpdated(res.data);
       onClose();
     } catch (err) {

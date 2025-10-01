@@ -152,7 +152,7 @@ class Performance(models.Model):
     reviewer = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='reviewed_performances')
     review_period_start = models.DateField()
     review_period_end = models.DateField()
-    overall_rating = models.IntegerField(choices=RATING_CHOICES)
+    overall_rating = models.FloatField(null=True, blank=True)
     goals_achievement = models.IntegerField(choices=RATING_CHOICES)
     communication = models.IntegerField(choices=RATING_CHOICES)
     teamwork = models.IntegerField(choices=RATING_CHOICES)
@@ -170,9 +170,19 @@ class Performance(models.Model):
         return f"Performance Review: {self.employee.user.get_full_name()} by {self.reviewer.user.get_full_name()} ({self.review_period_start} - {self.review_period_end}) - Status: {self.status}"
 
     def clean(self):
+        import calendar
+
+        # 0. Ép kỳ review về đầu và cuối tháng
+        if self.review_period_start:
+            self.review_period_start = self.review_period_start.replace(day=1)
+        if self.review_period_end:
+            last_day = calendar.monthrange(self.review_period_end.year, self.review_period_end.month)[1]
+            self.review_period_end = self.review_period_end.replace(day=last_day)
+
         # 1. Ngày bắt đầu < ngày kết thúc
-        if self.review_period_start >= self.review_period_end:
-            raise ValidationError("Review period start date must be before the end date.")
+        if self.review_period_start and self.review_period_end:
+            if self.review_period_start >= self.review_period_end:
+                raise ValidationError("Review period start date must be before the end date.")
 
         # 2. Reviewer không được là chính employee
         if self.reviewer == self.employee:
@@ -208,12 +218,29 @@ class Performance(models.Model):
         # 6. Check status transition nếu update
         if self.pk:
             valid_transitions = {
-                'draft': ['submitted'],
-                'submitted': ['feedback'],  # manager có thể finalize hoặc chuyển sang feedback để employee phản hồi
-                'feedback': ['finalized'],               # manager chỉnh sửa lại sau khi employee feedback
-                'finalized': [],
+                'draft': ['draft', 'submitted'],
+                'submitted': ['submitted', 'feedback'],   
+                'feedback': ['feedback', 'finalized'],    
+                'finalized': ['finalized'], 
             }
             prev_status = Performance.objects.get(pk=self.pk).status
             new_status = self.status
             if new_status not in valid_transitions[prev_status]:
                 raise ValidationError(f"Invalid status transition from {prev_status} to {new_status}.")
+
+    def save(self, *args, **kwargs):
+        # --- Tính lại overall_rating trước khi lưu ---
+        scores = [
+            self.goals_achievement,
+            self.communication,
+            self.teamwork,
+            self.initiative,
+        ]
+        valid_scores = [s for s in scores if s]  
+        if valid_scores:
+            avg_score = sum(valid_scores) / len(valid_scores)
+            self.overall_rating = round(avg_score, 2)
+
+        # Gọi clean() để đảm bảo logic
+        self.full_clean()
+        super().save(*args, **kwargs)

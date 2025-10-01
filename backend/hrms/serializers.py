@@ -120,7 +120,7 @@ class PerformanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Performance
         fields = '__all__'
-        read_only_fields = ['created_at', 'updated_at', 'reviewer']
+        read_only_fields = ['created_at', 'updated_at', 'reviewer', 'overall_rating']
 
     def get_employee_name(self, obj):
         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
@@ -144,27 +144,34 @@ class PerformanceSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"non_field_errors": ["Employee chỉ được phản hồi khi review đang ở trạng thái submitted"]}
                 )
-            instance.employee_comments = validated_data.get("employee_comments", instance.employee_comments)
-            instance.status = "feedback"  # đổi trạng thái
+            # chỉ cho phép sửa feedback
+            if "employee_comments" in validated_data:
+                instance.employee_comments = validated_data["employee_comments"]
+            instance.status = "feedback"
             instance.save()
             return instance
 
         if role == "manager":
-            # Manager có thể chỉnh sửa mọi field khi draft/submitted
+        # Manager chỉnh ratings/comments khi draft/submitted
             if instance.status in ["draft", "submitted"]:
                 for attr, value in validated_data.items():
-                    if attr != "status":
+                    if attr not in ["status", "employee", "reviewer"]:
                         setattr(instance, attr, value)
+                    # Nếu có request đổi sang submitted thì cho phép
+                if validated_data.get("status") == "submitted":
+                    instance.status = "submitted"
+                instance.save()
+                return instance
 
-            # Manager chỉ được finalize khi đang submitted hoặc feedback
+            # Manager finalize khi feedback
             if validated_data.get("status") == "finalized":
                 if instance.status != "feedback":
                     raise serializers.ValidationError(
-                        {"status": ["Chỉ có thể finalize từ submitted hoặc feedback"]}
-                )
-            instance.status = "finalized"
-            instance.save()
-            return instance
+                        {"status": ["Chỉ có thể finalize từ feedback"]}
+                    )
+                instance.status = "finalized"
+                instance.save()
+                return instance
         # Nếu role khác thì fallback
         return super().update(instance, validated_data)
     

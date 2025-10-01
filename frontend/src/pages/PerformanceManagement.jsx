@@ -70,9 +70,13 @@ const PerformanceManagement = () => {
   };
 
   const getRatingText = (rating) => {
-    const ratings = ['', 'Poor', 'Below Average', 'Average', 'Above Average', 'Excellent'];
-    return ratings[rating] || 'N/A';
-  };
+    if (!rating) return 'N/A';
+    if (rating < 1.5) return 'Poor';
+    if (rating < 2.5) return 'Below Average';
+    if (rating < 3.5) return 'Average';
+    if (rating < 4.5) return 'Above Average';
+    return 'Excellent';
+  };  
 
   const filteredPerformances = performances.filter((p) => {
     const q = searchQuery.toLowerCase();
@@ -128,10 +132,15 @@ const PerformanceManagement = () => {
 
       {/* Performance Overview */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+        {/* Ẩn nếu không cần Average Rating */}
+        {/* 
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-green-600">{analytics.avg_overall_rating || 'N/A'}</div>
+          <div className="text-2xl font-bold text-green-600">
+            {analytics.avg_overall_rating ? Number(analytics.avg_overall_rating).toFixed(2) : 'N/A'}
+          </div>
           <div className="text-sm text-gray-500">Average Rating</div>
         </div>
+        */}
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-2xl font-bold text-blue-600">{analytics.total_reviews || 0}</div>
           <div className="text-sm text-gray-500">Total Reviews</div>
@@ -158,7 +167,7 @@ const PerformanceManagement = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reviewer</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overall Rating</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overall Rating</th>             
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
@@ -178,7 +187,7 @@ const PerformanceManagement = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <span className={`text-sm font-medium ${getRatingColor(performance.overall_rating)}`}>
-                      {performance.overall_rating}/5
+                      {Number(performance.overall_rating).toFixed(2)}/5
                     </span>
                     <span className="ml-2 text-xs text-gray-500">
                       ({getRatingText(performance.overall_rating)})
