@@ -11,6 +11,8 @@ const LeaveManagement = () => {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterMonth, setFilterMonth] = useState('');
   const [showDetail, setShowDetail] = useState(false);
   const [stats, setStats] = useState({ pending: 0, approved_this_month: 0, rejected_this_month: 0 });
 
@@ -44,9 +46,14 @@ const LeaveManagement = () => {
     fetchData();
   }, []);
 
-  const filteredRequests = leaveRequests.filter(request =>
-    filterStatus === 'all' || request.status === filterStatus
-  );
+  const filteredRequests = leaveRequests.filter((request) => {
+    const matchStatus = filterStatus === 'all' || request.status === filterStatus;
+    const matchName = searchTerm === '' || request.employee_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchMonth = filterMonth === '' || (new Date(request.start_date).getMonth() + 1 === parseInt(filterMonth.split('-')[1]) &&
+    new Date(request.start_date).getFullYear() === parseInt(filterMonth.split('-')[0]));
+    return matchStatus && matchName && matchMonth;
+  });
+
 
   const handleApprove = async (id) => {
     const token = getToken();
@@ -94,18 +101,36 @@ const LeaveManagement = () => {
         )}
       </div>
 
+      {/* Filter */}
       <div className="bg-white rounded-lg shadow p-4 mb-6">
-        <select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        >
-          <option value="all">All Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
+        <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-4 md:space-y-0">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="all">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg"
+          />
+
+          <input
+            type="month"
+            value={filterMonth}
+            onChange={(e) => setFilterMonth(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        </div>
       </div>
 
       {user?.role === 'manager' && (
