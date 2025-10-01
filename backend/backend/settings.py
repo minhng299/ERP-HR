@@ -28,7 +28,7 @@ environ.Env.read_env(BASE_DIR / ".env")
 SECRET_KEY = 'django-insecure-r5bus_35%+x97)9mfw+f@d-1*pt$^c)by6gon-a*qly$1j0*ra'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env('DEBUG')
 
 ALLOWED_HOSTS = []
 
@@ -86,10 +86,10 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'erp_hr_db',
-        'USER': 'root',
-        'PASSWORD': '03022003',
-        'HOST': 'localhost',
+        'NAME': 'DB_NAME',
+        'USER': 'DB_USER',
+        'PASSWORD': 'DB_PASSWORD',
+        'HOST': 'DB_HOST',
         'PORT': '3306',
     }
 }
