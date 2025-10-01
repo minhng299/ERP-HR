@@ -179,6 +179,54 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({
                 'error': 'Employee profile not found'
             }, status=status.HTTP_404_NOT_FOUND)
+    
+
+@action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+def my_attendance(self, request):
+    """Lịch sử chấm công của nhân viên hiện tại"""
+    try:
+        employee = request.user.employee
+        date_from = request.query_params.get('date_from')
+        date_to = request.query_params.get('date_to')
+        
+        queryset = Attendance.objects.filter(employee=employee)
+        
+        # Lọc theo khoảng thời gian
+        if date_from:
+            queryset = queryset.filter(date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(date__lte=date_to)
+        
+        # Mặc định 30 ngày gần nhất
+        if not date_from and not date_to:
+            thirty_days_ago = timezone.now().date() - timedelta(days=30)
+            queryset = queryset.filter(date__gte=thirty_days_ago)
+        
+        queryset = queryset.order_by('-date')
+        serializer = AttendanceSerializer(queryset, many=True)
+        
+        # Thống kê đơn giản
+        total_days = queryset.count()
+        present_days = queryset.filter(check_in__isnull=False).count()
+        full_days = queryset.filter(
+            check_in__isnull=False, 
+            check_out__isnull=False
+        ).count()
+        
+        return Response({
+            'data': serializer.data,
+            'stats': {
+                'total_days': total_days,
+                'present_days': present_days,
+                'full_days': full_days,
+                'absent_days': total_days - present_days
+            }
+        })
+        
+    except Employee.DoesNotExist:
+        return Response({
+            'error': 'Employee profile not found'
+        }, status=status.HTTP_404_NOT_FOUND)
 
     # GIỮ NGUYÊN CÁC METHODS KHÁC CỦA BẠN
     @action(detail=False, methods=['get'])
