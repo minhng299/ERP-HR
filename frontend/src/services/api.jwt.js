@@ -198,6 +198,17 @@ export const hrapi = {
 
   updateReviewStatus: (id, status) => api.patch(`/performances/${id}/update_status/`, { status }),
   submitEmployeeFeedback: (id, feedback) => api.post(`/performances/${id}/feedback/`, { feedback }),
+
+  // Profile Management
+  updateMyProfile: (data) => api.patch('/employees/me/', data), // For users to update their own profile
+  updateEmployeeProfile: (id, data) => api.patch(`/employees/${id}/`, data), // For managers to update employee data
+  changePassword: (data) => api.post('/auth/change-password/', data),
+  getCurrentUser: () => api.get('/employees/me/'),
+  uploadProfilePicture: (formData) => api.patch('/employees/me/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
 };
 
 export default api;
