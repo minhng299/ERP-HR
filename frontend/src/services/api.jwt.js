@@ -184,6 +184,12 @@ export const hrapi = {
     }),
 
   // Performance
+  getPerformances: () => api.get('/performances/'),
+  createPerformance: (data) => api.post('/performances/', data),
+
+  // Payroll
+  getMySalary: () => api.get('/payroll/my-salary/'),
+  setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
   getPerformances: () => api.get('/performances/'),                     
   getPerformance: (id) => api.get(`/performances/${id}/`),              
   createPerformance: (data) => api.post('/performances/', data),        

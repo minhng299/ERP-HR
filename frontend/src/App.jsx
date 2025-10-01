@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LoginForm from './components/LoginForm';
+import SignUpForm from './components/SignUpForm';
 import ERPHRSystem from './pages/ERPHRSystem';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './index.css';
@@ -21,13 +22,19 @@ function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={<LoginForm />} />
-          <Route path="/*" element={
-            <PrivateRoute allowedRoles={["manager", "employee"]}>
-              <ERPHRSystem />
-            </PrivateRoute>
-          } />
-        </Routes>
+            <Route path="/signup" element={<SignUpForm />} />
+            <Route path="/login" element={<LoginForm />} />
+
+            <Route path="/*" element={
+              <PrivateRoute allowedRoles={["manager", "employee"]}>
+                <>
+                  
+                  <ERPHRSystem />
+                </>
+              </PrivateRoute>
+            } />
+          </Routes>
+
       </Router>
     </AuthProvider>
   );

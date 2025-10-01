@@ -42,6 +42,7 @@ class Employee(models.Model):
     department = models.ForeignKey(Department, on_delete=models.CASCADE)
     position = models.ForeignKey(Position, on_delete=models.CASCADE)
     salary = models.DecimalField(max_digits=10, decimal_places=2)
+    net_salary = models.DecimalField(max_digits=12, decimal_places=2, default=0, help_text="Lương thực nhận sau khi bị trừ")
     manager = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=EMPLOYMENT_STATUS, default='active')
     profile_picture = models.URLField(blank=True)
@@ -54,6 +55,10 @@ class Employee(models.Model):
     
     def __str__(self):
         return f"{self.user.first_name} {self.user.last_name} ({self.employee_id})"
+
+    @property
+    def department_name(self):
+        return self.department.name if self.department else None
 
 class Attendance(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
@@ -86,7 +91,14 @@ class LeaveType(models.Model):
     
     def __str__(self):
         return self.name
-    
+
+class LeavePenalty(models.Model):
+    leave_type = models.ForeignKey('LeaveType', on_delete=models.CASCADE, related_name='penalties')
+    penalty_percent = models.DecimalField(max_digits=5, decimal_places=2, help_text='Phần trăm phạt lương khi nghỉ loại này (VD: 50.00 cho 50%)')
+
+    def __str__(self):
+        return f"{self.leave_type.name} - {self.penalty_percent}%"
+
 @receiver(pre_save, sender=LeaveType)
 def generate_code(sender, instance, **kwargs):
         if not instance.code:
@@ -217,3 +229,4 @@ class Performance(models.Model):
             new_status = self.status
             if new_status not in valid_transitions[prev_status]:
                 raise ValidationError(f"Invalid status transition from {prev_status} to {new_status}.")
+

@@ -15,8 +15,23 @@ from .models import Employee, Department, Position, Attendance, LeaveRequest, Le
 from .serializers import (
     EmployeeSerializer, DepartmentSerializer, PositionSerializer,
     AttendanceSerializer, LeaveRequestSerializer, LeaveTypeSerializer,
-    PerformanceSerializer
+    PerformanceSerializer, SignUpSerializer
 )
+from rest_framework.views import APIView
+from django.contrib.auth import authenticate
+class SignUpView(APIView):
+    permission_classes = []  # Allow any
+
+    def post(self, request):
+        serializer = SignUpSerializer(data=request.data)
+        if serializer.is_valid():
+            employee = serializer.save()
+            return Response({
+                "message": "User registered successfully.",
+                "employee_id": employee.id,
+                "username": employee.user.username
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 from .permissions import IsManagerOrReadOnly, IsEmployee
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import ValidationError
