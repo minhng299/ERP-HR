@@ -28,7 +28,7 @@ function App() {
             <Route path="/*" element={
               <PrivateRoute allowedRoles={["manager", "employee"]}>
                 <>
-                  <LogoutButton />
+                  
                   <ERPHRSystem />
                 </>
               </PrivateRoute>

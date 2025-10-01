@@ -18,4 +18,5 @@ router.register(r'performances', PerformanceViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('auth/change-password/', change_password, name='change_password'),
+    path('api/payroll/', include('payroll.urls')),
 ]
