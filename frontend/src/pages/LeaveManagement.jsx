@@ -46,6 +46,35 @@ const LeaveManagement = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    if (user?.role === 'manager') {
+      let approved = leaveRequests.filter(req => req.status === 'approved');
+      let rejected = leaveRequests.filter(req => req.status === 'rejected');
+      let pending = leaveRequests.filter(req => req.status === 'pending');
+
+      if (filterMonth) {
+        const [year, month] = filterMonth.split('-').map(Number);
+
+        approved = approved.filter(req => {
+          const date = new Date(req.start_date);
+          return date.getMonth() + 1 === month && date.getFullYear() === year;
+        });
+
+        rejected = rejected.filter(req => {
+          const date = new Date(req.start_date);
+          return date.getMonth() + 1 === month && date.getFullYear() === year;
+        });
+      }
+
+      setStats({
+        pending: pending.length,
+        approved_this_month: approved.length,
+        rejected_this_month: rejected.length
+      });
+    }
+  }, [leaveRequests, filterMonth, user]);
+
+
   const filteredRequests = leaveRequests.filter((request) => {
     const matchStatus = filterStatus === 'all' || request.status === filterStatus;
     const matchName = searchTerm === '' || request.employee_name.toLowerCase().includes(searchTerm.toLowerCase());
