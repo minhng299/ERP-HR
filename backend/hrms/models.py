@@ -60,7 +60,10 @@ class Attendance(models.Model):
     date = models.DateField()
     check_in = models.TimeField()
     check_out = models.TimeField(null=True, blank=True)
-    break_duration = models.DurationField(default='00:00:00')
+    
+    # SỬA: Thay DurationField bằng CharField
+    break_duration = models.CharField(max_length=20, default='00:00:00')
+    
     total_hours = models.DurationField(null=True, blank=True)
     notes = models.TextField(blank=True)
     
@@ -68,12 +71,7 @@ class Attendance(models.Model):
         unique_together = ('employee', 'date')
     
     def save(self, *args, **kwargs):
-        if self.check_in and self.check_out:
-            from datetime import datetime, timedelta
-            check_in_dt = datetime.combine(self.date, self.check_in)
-            check_out_dt = datetime.combine(self.date, self.check_out)
-            total = check_out_dt - check_in_dt - self.break_duration
-            self.total_hours = total
+        # KHÔNG tính toán gì cả, chỉ lưu đơn giản
         super().save(*args, **kwargs)
 
 class LeaveType(models.Model):

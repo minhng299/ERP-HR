@@ -178,3 +178,55 @@ class PerformanceSerializer(serializers.ModelSerializer):
             except ValidationError as e:
                 raise serializers.ValidationError(e.message_dict or e.messages)
         return attrs
+    
+
+
+# ----------------- cham cong
+class CheckInSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True)
+    
+class CheckOutSerializer(serializers.Serializer):
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+class AttendanceDetailSerializer(serializers.ModelSerializer):
+    employee_name = serializers.SerializerMethodField()
+    date_display = serializers.DateField(source='date', format='%d/%m/%Y')
+    check_in_display = serializers.TimeField(source='check_in', format='%H:%M')
+    check_out_display = serializers.TimeField(source='check_out', format='%H:%M', allow_null=True)
+    total_hours_display = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Attendance
+        fields = [
+            'id', 'employee', 'employee_name', 'date', 'date_display',
+            'check_in', 'check_in_display', 'check_out', 'check_out_display',
+            'break_duration', 'total_hours', 'total_hours_display', 'notes'
+        ]
+    
+    def get_employee_name(self, obj):
+        return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
+    
+    def get_total_hours_display(self, obj):
+        if obj.total_hours:
+            total_seconds = int(obj.total_hours.total_seconds())
+            hours = total_seconds // 3600
+            minutes = (total_seconds % 3600) // 60
+            return f"{hours:02d}:{minutes:02d}"
+        return "00:00"
+    
+class AttendanceDetailSerializer(serializers.ModelSerializer):
+    employee_name = serializers.SerializerMethodField()
+    date_display = serializers.DateField(source='date', format='%d/%m/%Y')
+    check_in_display = serializers.TimeField(source='check_in', format='%H:%M')
+    check_out_display = serializers.TimeField(source='check_out', format='%H:%M', allow_null=True)
+    
+    class Meta:
+        model = Attendance
+        fields = [
+            'id', 'employee', 'employee_name', 'date', 'date_display',
+            'check_in', 'check_in_display', 'check_out', 'check_out_display',
+            'break_duration', 'total_hours', 'notes'
+        ]
+    
+    def get_employee_name(self, obj):
+        return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"

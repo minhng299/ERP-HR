@@ -69,7 +69,118 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.select_related('employee__user').all()
     serializer_class = AttendanceSerializer
     
-    
+    # CÁC ACTION METHODS - ĐẢM BẢO THỤT LỀ ĐÚNG
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def check_in(self, request):
+        """Nhân viên check-in"""
+        try:
+            employee = request.user.employee
+            today = timezone.now().date()
+            
+            # Kiểm tra đã check-in chưa
+            existing_attendance = Attendance.objects.filter(
+                employee=employee, 
+                date=today
+            ).first()
+            
+            if existing_attendance and existing_attendance.check_in:
+                return Response({
+                    'error': 'Bạn đã check-in hôm nay'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Tạo attendance record
+            attendance = Attendance(
+                employee=employee,
+                date=today,
+                check_in=timezone.now().time(),
+                notes=request.data.get('notes', ''),
+                break_duration='00:00:00'
+            )
+            attendance.save()
+            
+            serializer = AttendanceSerializer(attendance)
+            return Response({
+                'message': 'Check-in thành công',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Employee.DoesNotExist:
+            return Response({
+                'error': 'Employee profile not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def check_out(self, request):
+        """Nhân viên check-out"""
+        try:
+            employee = request.user.employee
+            today = timezone.now().date()
+            
+            # Tìm bản ghi chấm công hôm nay
+            attendance = Attendance.objects.filter(
+                employee=employee, 
+                date=today
+            ).first()
+            
+            if not attendance:
+                return Response({
+                    'error': 'Bạn chưa check-in hôm nay'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if attendance.check_out:
+                return Response({
+                    'error': 'Bạn đã check-out hôm nay'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Cập nhật check-out
+            attendance.check_out = timezone.now().time()
+            if request.data.get('notes'):
+                attendance.notes = request.data.get('notes', '')
+            attendance.save()
+            
+            serializer = AttendanceSerializer(attendance)
+            return Response({
+                'message': 'Check-out thành công',
+                'data': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Employee.DoesNotExist:
+            return Response({
+                'error': 'Employee profile not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def today_status(self, request):
+        """Trạng thái chấm công hôm nay"""
+        try:
+            employee = request.user.employee
+            today = timezone.now().date()
+            
+            attendance = Attendance.objects.filter(
+                employee=employee, 
+                date=today
+            ).first()
+            
+            if attendance:
+                serializer = AttendanceSerializer(attendance)
+                return Response({
+                    'has_checked_in': bool(attendance.check_in),
+                    'has_checked_out': bool(attendance.check_out),
+                    'attendance': serializer.data
+                })
+            else:
+                return Response({
+                    'has_checked_in': False,
+                    'has_checked_out': False,
+                    'attendance': None
+                })
+                
+        except Employee.DoesNotExist:
+            return Response({
+                'error': 'Employee profile not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    # GIỮ NGUYÊN CÁC METHODS KHÁC CỦA BẠN
     @action(detail=False, methods=['get'])
     def today(self, request):
         today = timezone.now().date()
