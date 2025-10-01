@@ -91,7 +91,14 @@ class LeaveType(models.Model):
     
     def __str__(self):
         return self.name
-    
+
+class LeavePenalty(models.Model):
+    leave_type = models.ForeignKey('LeaveType', on_delete=models.CASCADE, related_name='penalties')
+    penalty_percent = models.DecimalField(max_digits=5, decimal_places=2, help_text='Phần trăm phạt lương khi nghỉ loại này (VD: 50.00 cho 50%)')
+
+    def __str__(self):
+        return f"{self.leave_type.name} - {self.penalty_percent}%"
+
 @receiver(pre_save, sender=LeaveType)
 def generate_code(sender, instance, **kwargs):
         if not instance.code:
@@ -222,3 +229,4 @@ class Performance(models.Model):
             new_status = self.status
             if new_status not in valid_transitions[prev_status]:
                 raise ValidationError(f"Invalid status transition from {prev_status} to {new_status}.")
+

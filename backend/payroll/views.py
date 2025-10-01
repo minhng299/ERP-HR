@@ -45,48 +45,48 @@ class MySalaryView(APIView):
             employee = Employee.objects.get(user=user)
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
-        ##chú ý
-        today = date.today()
-        # today = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
 
-        # Tính lại lương dựa trên số ngày nghỉ/thưởng, update vào SalaryRecord tháng hiện tại
+        today = date.today()
+        # Lấy tháng trước (nếu muốn lương tháng vừa rồi)
+        today = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+
         from payroll.services import PayrollService
+        penalty_per_day = 100000
         base_salary = employee.salary
         bonus = 0
-        penalty_per_day = 100000
-        late_days, absent_days, num_days = PayrollService.get_late_or_absent_days(employee, today)
-        deductions = (late_days + absent_days) * penalty_per_day
-        # Nếu là nhân viên mới, chia lương theo số ngày làm thực tế
-        if num_days < 28:
-            daily_salary = float(base_salary) / 28
-            base_salary_calc = daily_salary * num_days
-        else:
-            base_salary_calc = float(base_salary)
-        total_salary = base_salary_calc + bonus - deductions
-        # Update hoặc tạo mới SalaryRecord tháng này
-        from payroll.models import SalaryRecord
         month = today.replace(day=1)
-        record = SalaryRecord.objects.filter(employee_id=employee.id, month__year=today.year, month__month=today.month).first()
+
+        # --- Gọi service để tạo/ cập nhật SalaryRecord ---
+        record = SalaryRecord.objects.filter(
+            employee_id=employee.id,
+            month__year=month.year,
+            month__month=month.month
+        ).first()
+
         if record:
-            record.base_salary = base_salary
-            record.bonus = bonus
-            record.deductions = deductions
-            record.total_salary = total_salary
-            record.month = month
-            record.save()
-        else:
-            record = SalaryRecord.objects.create(
+            # update lại record qua service
+            record.delete()  # xoá bản cũ để tạo lại cho chuẩn
+            record = PayrollService.create_salary_record(
                 employee_id=employee.id,
                 base_salary=base_salary,
                 bonus=bonus,
-                deductions=deductions,
-                total_salary=total_salary,
-                month=month
+                month=month,
+                penalty_per_day=penalty_per_day
             )
+        else:
+            # tạo mới
+            record = PayrollService.create_salary_record(
+                employee_id=employee.id,
+                base_salary=base_salary,
+                bonus=bonus,
+                month=month,
+                penalty_per_day=penalty_per_day
+            )
+
         return Response({
             'net_salary': record.total_salary,
             'base_salary': record.base_salary,
             'bonus': record.bonus,
-            'deductions': record.deductions,
+            'deductions': int(record.deductions),
             'month': record.month,
         })

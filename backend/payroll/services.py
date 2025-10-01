@@ -29,34 +29,33 @@ class PayrollService:
         penalty_per_day = 100000
         bonus = 0
 
-        total_salary = PayrollService.calculate_salary(
-        base_salary=new_salary,
-        bonus=bonus,
-        month=month,
-        employee_id=employee.id,
-        penalty_per_day=penalty_per_day
-    )
-        
+        # Tính lại lương, deductions, bonus cho tháng hiện tại
         late_days, absent_days, num_days = PayrollService.get_late_or_absent_days(employee, month)
         deductions = (late_days + absent_days) * penalty_per_day
-
-        record, created = SalaryRecord.objects.get_or_create(
-        employee_id=employee.id,
-        month=month,
-        defaults={
-            "base_salary": new_salary,
-            "bonus": bonus,
-            "deductions": deductions,
-            "total_salary": total_salary
+        total_salary = PayrollService.calculate_salary(
+            base_salary=new_salary,
+            bonus=bonus,
+            month=month,
+            employee_id=employee.id,
+            penalty_per_day=penalty_per_day
+        )
+        record, _ = SalaryRecord.objects.get_or_create(
+            employee_id=employee.id,
+            month=month,
+            defaults={
+                "base_salary": new_salary,
+                "bonus": bonus,
+                "deductions": deductions,
+                "total_salary": total_salary
             }
         )
-        if not created:
-            record.base_salary = new_salary
-            record.bonus = bonus
-            record.deductions = deductions
-            record.total_salary = total_salary
-            record.save()
-            return employee
+        # Luôn cập nhật lại các trường lương
+        record.base_salary = new_salary
+        record.bonus = bonus
+        record.deductions = deductions
+        record.total_salary = total_salary
+        record.save()
+        return employee
         
 
     @staticmethod
@@ -109,7 +108,21 @@ class PayrollService:
         # print("DEBUG attended_dates:", attended_dates)
 
         # Số ngày làm thực tế
-        absent_days = sum(1 for d in working_days if d not in attended_dates)
+        # Lấy các ngày nghỉ phép đã được duyệt
+        from hrms.models import LeaveRequest
+        approved_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__gte=calc_start,
+            end_date__lt=calc_end
+        )
+        approved_leave_days = set()
+        for lr in approved_leaves:
+            days = (lr.end_date - lr.start_date).days + 1
+            for i in range(days):
+                approved_leave_days.add(lr.start_date + timedelta(days=i))
+        # absent_days chỉ tính những ngày không đi làm và không có đơn nghỉ được duyệt
+        absent_days = sum(1 for d in working_days if d not in attended_dates and d not in approved_leave_days)
         
         print(f"DEBUG late_days={late_days}, absent_days={absent_days}, num_days={num_days}")
         return late_days, absent_days, num_days
@@ -139,25 +152,103 @@ class PayrollService:
 
         base_salary_calc = PayrollService.calculate_base_salary(base_salary, num_days, is_new_employee)
         deductions = (late_days + absent_days) * penalty_per_day
+
+            # --- Leave Penalty Logic ---
+        from hrms.models import LeaveRequest, LeavePenalty
+        # Lấy các đơn nghỉ được duyệt trong tháng
+        approved_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__gte=start_month,
+            start_date__lt=(start_month.replace(month=start_month.month+1) if start_month.month < 12 else start_month.replace(year=start_month.year+1, month=1))
+        )
+        # Tổng số ngày nghỉ được duyệt
+        total_leave_days = sum([lr.days_requested or (lr.end_date - lr.start_date).days + 1 for lr in approved_leaves])
+        penalty_total = 0
+        if total_leave_days > 4:
+            # Chỉ tính phạt cho số ngày vượt quá 4
+            penalty_days = total_leave_days - 4
+            # Tính phạt cho từng loại nghỉ
+            for lr in approved_leaves:
+                leave_penalty = LeavePenalty.objects.filter(leave_type=lr.leave_type).first()
+                percent = float(leave_penalty.penalty_percent) if leave_penalty else 0
+                # Số ngày nghỉ của đơn này vượt quá 4?
+                days = lr.days_requested or (lr.end_date - lr.start_date).days + 1
+                # Nếu còn penalty_days > 0 thì trừ tiếp
+                if penalty_days > 0:
+                    apply_days = min(days, penalty_days)
+                    daily_salary = float(base_salary) / 28
+                    penalty_total += daily_salary * (percent / 100) * apply_days
+                    penalty_days -= apply_days
+
+        penalty_total = int(penalty_total)
+        # Trừ tổng tiền phạt vào lương
+        return int(base_salary_calc + bonus - deductions - penalty_total)
         
-        return base_salary_calc + bonus - deductions
     
 
     @staticmethod
     def create_salary_record(employee_id, base_salary, bonus, month, penalty_per_day=100000):
         employee = Employee.objects.get(pk=employee_id)
-        total = PayrollService.calculate_salary(base_salary, bonus, month, employee_id, penalty_per_day)
 
+        # Lấy số ngày đi muộn, nghỉ, số ngày công
         late_days, absent_days, num_days = PayrollService.get_late_or_absent_days(employee, month)
-        deductions = (late_days + absent_days) * penalty_per_day
-        base_salary_calc = PayrollService.calculate_base_salary(base_salary, num_days)
 
+        # Tính deductions chuẩn từ late + absent
+        deductions = (late_days + absent_days) * penalty_per_day
+
+        # Xác định nhân viên mới hay cũ
+        start_month = month.replace(day=1)
+        is_new_employee = employee.hire_date >= start_month
+
+        # Lương cơ bản tính toán (nếu nhân viên mới thì chia ngày công)
+        base_salary_calc = PayrollService.calculate_base_salary(base_salary, num_days, is_new_employee)
+
+
+        # --- B5: penalty_total = tiền phạt do nghỉ phép vượt quá 4 ngày ---
+        from hrms.models import LeaveRequest, LeavePenalty
+        if start_month.month == 12:
+            next_month = date(start_month.year + 1, 1, 1)
+        else:
+            next_month = date(start_month.year, start_month.month + 1, 1)
+
+        approved_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__gte=start_month,
+            end_date__lt=next_month
+        )
+
+        total_leave_days = sum((lr.end_date - lr.start_date).days + 1 for lr in approved_leaves)
+        penalty_total = 0
+        if total_leave_days > 4:
+            penalty_days = total_leave_days - 4
+            for lr in approved_leaves:
+                leave_penalty = LeavePenalty.objects.filter(leave_type=lr.leave_type).first()
+                percent = float(leave_penalty.penalty_percent) if leave_penalty else 0
+                days = (lr.end_date - lr.start_date).days + 1
+                if penalty_days > 0:
+                    apply_days = min(days, penalty_days)
+                    daily_salary = float(base_salary) / 28
+                    penalty_total += daily_salary * (percent / 100) * apply_days
+                    penalty_days -= apply_days
+        
+        # Tính total_salary bằng công thức chuẩn (bao gồm penalty leave nếu có)
+        total_salary = PayrollService.calculate_salary(
+            base_salary=base_salary,
+            bonus=bonus,
+            month=month,
+            employee_id=employee_id,
+            penalty_per_day=penalty_per_day
+        )
+        # Tạo record với đúng deductions từ late+absent
         record = SalaryRecord.objects.create(
             employee_id=employee_id,
             base_salary=base_salary_calc,
             bonus=bonus,
-            deductions=deductions,
-            total_salary=total,
+            deductions=deductions + penalty_total,   # <- lấy từ get_late_or_absent_days
+            total_salary=total_salary,
             month=month
-    )
+        )
         return record
+
