@@ -204,9 +204,6 @@ Authorization: Bearer <token>
 ```
 
 **ĐẦU VÀO:** Không có body (hoặc query params)
-```http
-GET /api/attendance/my_attendance/?date_from=2025-10-01&date_to=2025-10-31
-```
 
 **ĐẦU RA:**
 ```json
@@ -269,3 +266,14 @@ Authorization: Bearer <manager_token>
 }
 ```
 
+### Lịch sử chấm công
+GET http://localhost:8000/api/attendance/my_attendance/
+Authorization: Bearer {{token}}
+
+### Manager xem phòng ban
+GET http://localhost:8000/api/attendance/department_attendance/?date=2025-10-01
+Authorization: Bearer {{manager_token}}
+
+### Thống kê
+GET http://localhost:8000/api/attendance/stats/
+Authorization: Bearer {{manager_token}}

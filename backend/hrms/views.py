@@ -179,111 +179,134 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({
                 'error': 'Employee profile not found'
             }, status=status.HTTP_404_NOT_FOUND)
-    
 
-@action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
-def my_attendance(self, request):
-    """Lịch sử chấm công của nhân viên hiện tại"""
-    try:
-        employee = request.user.employee
-        date_from = request.query_params.get('date_from')
-        date_to = request.query_params.get('date_to')
-        
-        queryset = Attendance.objects.filter(employee=employee)
-        
-        # Lọc theo khoảng thời gian
-        if date_from:
-            queryset = queryset.filter(date__gte=date_from)
-        if date_to:
-            queryset = queryset.filter(date__lte=date_to)
-        
-        # Mặc định 30 ngày gần nhất
-        if not date_from and not date_to:
-            thirty_days_ago = timezone.now().date() - timedelta(days=30)
-            queryset = queryset.filter(date__gte=thirty_days_ago)
-        
-        queryset = queryset.order_by('-date')
-        serializer = AttendanceSerializer(queryset, many=True)
-        
-        # Thống kê đơn giản
-        total_days = queryset.count()
-        present_days = queryset.filter(check_in__isnull=False).count()
-        full_days = queryset.filter(
-            check_in__isnull=False, 
-            check_out__isnull=False
-        ).count()
-        
-        return Response({
-            'data': serializer.data,
-            'stats': {
-                'total_days': total_days,
-                'present_days': present_days,
-                'full_days': full_days,
-                'absent_days': total_days - present_days
-            }
-        })
-        
-    except Employee.DoesNotExist:
-        return Response({
-            'error': 'Employee profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
-
-@action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrReadOnly])
-def department_attendance(self, request):
-    """Manager xem chấm công của phòng ban"""
-    try:
-        manager = request.user.employee
-        
-        # Kiểm tra user có phải manager không
-        if manager.role != 'manager':
-            return Response({
-                'error': 'Chỉ manager mới có quyền truy cập'
-            }, status=status.HTTP_403_FORBIDDEN)
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    def my_attendance(self, request):
+        """Lịch sử chấm công của nhân viên hiện tại"""
+        try:
+            employee = request.user.employee
+            date_from = request.query_params.get('date_from')
+            date_to = request.query_params.get('date_to')
             
-        target_date = request.query_params.get('date', timezone.now().date())
-        
-        # Lấy tất cả nhân viên trong phòng ban
-        department_employees = Employee.objects.filter(
-            department=manager.department,
-            status='active'
-        )
-        
-        # Lấy chấm công trong ngày
-        attendance_records = Attendance.objects.filter(
-            employee__in=department_employees,
-            date=target_date
-        ).select_related('employee__user')
-        
-        # Tạo danh sách đầy đủ
-        result = []
-        for employee in department_employees:
-            record = attendance_records.filter(employee=employee).first()
-            if record:
-                serializer = AttendanceSerializer(record)
-                attendance_data = serializer.data
-                attendance_data['employee_name'] = f"{employee.user.first_name} {employee.user.last_name}"
-                attendance_data['status'] = 'present' if record.check_in else 'absent'
-                result.append(attendance_data)
-            else:
-                result.append({
-                    'employee': employee.id,
-                    'employee_name': f"{employee.user.first_name} {employee.user.last_name}",
-                    'date': target_date,
-                    'check_in': None,
-                    'check_out': None,
-                    'status': 'absent'
-                })
-        
-        return Response({
-            'date': target_date,
-            'department': manager.department.name,
-            'attendance': result
-        })
-        
-    except Employee.DoesNotExist:
-        return Response({
-            'error': 'Employee profile not found'
-        }, status=status.HTTP_404_NOT_FOUND)
+            queryset = Attendance.objects.filter(employee=employee)
+            
+            # Lọc theo khoảng thời gian
+            if date_from:
+                queryset = queryset.filter(date__gte=date_from)
+            if date_to:
+                queryset = queryset.filter(date__lte=date_to)
+            
+            # Mặc định 30 ngày gần nhất
+            if not date_from and not date_to:
+                thirty_days_ago = timezone.now().date() - timedelta(days=30)
+                queryset = queryset.filter(date__gte=thirty_days_ago)
+            
+            queryset = queryset.order_by('-date')
+            serializer = AttendanceSerializer(queryset, many=True)
+            
+            # Thống kê đơn giản
+            total_days = queryset.count()
+            present_days = queryset.filter(check_in__isnull=False).count()
+            full_days = queryset.filter(
+                check_in__isnull=False, 
+                check_out__isnull=False
+            ).count()
+            
+            return Response({
+                'data': serializer.data,
+                'stats': {
+                    'total_days': total_days,
+                    'present_days': present_days,
+                    'full_days': full_days,
+                    'absent_days': total_days - present_days
+                }
+            })
+            
+        except Employee.DoesNotExist:
+            return Response({
+                'error': 'Employee profile not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrReadOnly])
+    def department_attendance(self, request):
+        """Manager xem chấm công của phòng ban"""
+        try:
+            manager = request.user.employee
+            
+            # Kiểm tra user có phải manager không
+            if manager.role != 'manager':
+                return Response({
+                    'error': 'Chỉ manager mới có quyền truy cập'
+                }, status=status.HTTP_403_FORBIDDEN)
+                
+            target_date = request.query_params.get('date', timezone.now().date())
+            
+            # Lấy tất cả nhân viên trong phòng ban
+            department_employees = Employee.objects.filter(
+                department=manager.department,
+                status='active'
+            )
+            
+            # Lấy chấm công trong ngày
+            attendance_records = Attendance.objects.filter(
+                employee__in=department_employees,
+                date=target_date
+            ).select_related('employee__user')
+            
+            # Tạo danh sách đầy đủ
+            result = []
+            for employee in department_employees:
+                record = attendance_records.filter(employee=employee).first()
+                if record:
+                    serializer = AttendanceSerializer(record)
+                    attendance_data = serializer.data
+                    attendance_data['employee_name'] = f"{employee.user.first_name} {employee.user.last_name}"
+                    attendance_data['status'] = 'present' if record.check_in else 'absent'
+                    result.append(attendance_data)
+                else:
+                    result.append({
+                        'employee': employee.id,
+                        'employee_name': f"{employee.user.first_name} {employee.user.last_name}",
+                        'date': target_date,
+                        'check_in': None,
+                        'check_out': None,
+                        'status': 'absent'
+                    })
+            
+            return Response({
+                'date': target_date,
+                'department': manager.department.name,
+                'attendance': result
+            })
+            
+        except Employee.DoesNotExist:
+            return Response({
+                'error': 'Employee profile not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated, IsManagerOrReadOnly])
+    def stats(self, request):
+        """Thống kê điểm danh"""
+        try:
+            today = timezone.now().date()
+            start_of_month = today.replace(day=1)
+
+            # Thống kê đơn giản
+            total_employees = Employee.objects.filter(status='active').count()
+            present_today = Attendance.objects.filter(date=today, check_in__isnull=False).count()
+            pending_leaves = LeaveRequest.objects.filter(status='pending').count()
+
+            return Response({
+                'total_employees': total_employees,
+                'present_today': present_today,
+                'absent_today': total_employees - present_today,
+                'pending_leaves': pending_leaves
+            })
+            
+        except Exception as e:
+            return Response({
+                'error': str(e)
+            }, status=status.HTTP_400_BAD_REQUEST)
 
     # GIỮ NGUYÊN CÁC METHODS KHÁC CỦA BẠN
     @action(detail=False, methods=['get'])
