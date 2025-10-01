@@ -15,6 +15,7 @@ export const AuthProvider = ({ children }) => {
       try {
         setError(null);
         const res = await hrapi.getEmployee('me');
+        console.log('Authenticated user:', res.data);
         setUser(res.data);
       } catch (error) {
         console.error('Failed to fetch user:', error);
