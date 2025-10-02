@@ -15,7 +15,9 @@ class PayrollService:
         manager = Employee.objects.get(user=manager_user)
         if manager.role != 'manager':
             raise PermissionError("Chỉ manager mới được phép set lương cơ bản cho nhân viên.")
-        
+
+        print("employee_id:", employee_id)
+        print("new_salary:", new_salary)
         employee = Employee.objects.get(pk=employee_id)
         employee.salary = new_salary
         employee.save()

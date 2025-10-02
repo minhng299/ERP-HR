@@ -6,7 +6,14 @@ from datetime import date, time, timedelta, datetime
 class Command(BaseCommand):
     # Chỉ xóa dữ liệu Attendance để đảm bảo tạo mới
     def handle(self, *args, **options):
+        print("Deleting old data...")
         Attendance.objects.all().delete()
+        Performance.objects.all().delete()
+        Employee.objects.all().delete()
+        Department.objects.all().delete()
+        Position.objects.all().delete()
+        LeaveType.objects.all().delete()
+        User.objects.all().delete()
         # Create departments
         departments = [
             {'name': 'Engineering', 'description': 'Software development and technical teams'},
@@ -144,4 +151,38 @@ class Command(BaseCommand):
                 employee_comments='Thank you!',
             )
 
+        import random
+        extra_emp_objs = []
+        for dept in dept_objs:
+            pos = dept.position_set.first() or pos_objs[0]
+            num_users = random.randint(5, 10)
+            for i in range(num_users):
+                role = 'manager' if i < 2 else 'employee'
+                username = f"{dept.name.lower()}_{role}{i+1}"
+                email = f"{username}@example.com"
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password="admin123",
+                    first_name=dept.name,
+                    last_name=role.capitalize()
+                )
+                emp = Employee.objects.create(
+                    user=user,
+                    employee_id=f"{dept.name[:2].upper()}{i+1:03d}",
+                    phone_number=f"+1000000{i:04d}",
+                    address="456 Extra St",
+                    date_of_birth=date(1995, 1, 1),
+                    hire_date=date(2022, 1, 1),
+                    department=dept,
+                    position=pos,
+                    salary=random.randint(6000000, 15000000),
+                    manager=None,
+                    status="active",
+                    profile_picture="",
+                    role=role
+                )
+                extra_emp_objs.append(emp)
+                print(f"Created extra {role}: {username} in {dept.name}")
+                
         self.stdout.write(self.style.SUCCESS('Successfully populated sample data'))
