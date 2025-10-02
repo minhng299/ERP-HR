@@ -1,18 +1,38 @@
 import axios from 'axios';
 
 const API_BASE_URL = 'http://localhost:8000/api';
-const TOKEN_KEY = 'jwt_token';
+const ACCESS_TOKEN_KEY = 'access_token';
+const REFRESH_TOKEN_KEY = 'refresh_token';
 
-export const setToken = (token) => {
-  localStorage.setItem(TOKEN_KEY, token);
+export const setTokens = (accessToken, refreshToken) => {
+  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 };
 
+export const getAccessToken = () => {
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
+};
+
+export const getRefreshToken = () => {
+  return localStorage.getItem(REFRESH_TOKEN_KEY);
+};
+
+export const removeTokens = () => {
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+};
+
+// Legacy function for compatibility
 export const getToken = () => {
-  return localStorage.getItem(TOKEN_KEY);
+  return getAccessToken();
+};
+
+export const setToken = (token) => {
+  setTokens(token, null);
 };
 
 export const removeToken = () => {
-  localStorage.removeItem(TOKEN_KEY);
+  removeTokens();
 };
 
 const api = axios.create({
@@ -22,19 +42,68 @@ const api = axios.create({
   },
 });
 
-// Attach JWT token to every request
+// Token refresh function
+const refreshAccessToken = async () => {
+  const refreshToken = getRefreshToken();
+  if (!refreshToken) {
+    throw new Error('No refresh token available');
+  }
+  
+  try {
+    const response = await axios.post(`${API_BASE_URL}/token/refresh/`, {
+      refresh: refreshToken
+    });
+    
+    const { access, refresh: newRefresh } = response.data;
+    setTokens(access, newRefresh || refreshToken);
+    return access;
+  } catch (error) {
+    removeTokens();
+    window.location.href = '/login';
+    throw error;
+  }
+};
+
+// Attach JWT token to every request and handle token refresh
 api.interceptors.request.use((config) => {
-  const token = getToken();
+  const token = getAccessToken();
   if (token) {
     config.headers['Authorization'] = `Bearer ${token}`;
   }
   return config;
 });
 
+// Response interceptor to handle token refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+      
+      try {
+        const newToken = await refreshAccessToken();
+        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        return Promise.reject(refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
+
 export const login = async (username, password) => {
   const response = await axios.post(`${API_BASE_URL}/token/`, { username, password });
-  setToken(response.data.access);
+  setTokens(response.data.access, response.data.refresh);
   return response.data;
+};
+
+export const logout = () => {
+  removeTokens();
+  window.location.href = '/login';
 };
 
 export const hrapi = {
@@ -47,7 +116,7 @@ export const hrapi = {
   getEmployees: () => api.get('/employees/'),
   getEmployee: (id) => api.get(`/employees/${id}/`),
   createEmployee: (data) => api.post('/employees/', data),
-  updateEmployee: (id, data) => api.put(`/employees/${id}/`, data),
+  updateEmployee: (id, data) => api.patch(`/employees/${id}/`, data),
   deleteEmployee: (id) => api.delete(`/employees/${id}/`),
 
   // Departments
@@ -59,10 +128,24 @@ export const hrapi = {
   createPosition: (data) => api.post('/positions/', data),
 
   // Attendance
-  getAttendance: () => api.get('/attendance/'),
+  getAttendance: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/attendance/${queryString ? '?' + queryString : ''}`);
+  },
   getTodayAttendance: () => api.get('/attendance/today/'),
+  getAttendanceStats: () => api.get('/attendance/stats/'),
+  getCurrentStatus: () => api.get('/attendance/current_status/'),
+  
+  // Real-time attendance actions
+  checkIn: () => api.post('/attendance/check_in/'),
+  checkOut: () => api.post('/attendance/check_out/'),
+  startBreak: () => api.post('/attendance/start_break/'),
+  endBreak: () => api.post('/attendance/end_break/'),
+  
+  // Traditional CRUD for managers
   createAttendance: (data) => api.post('/attendance/', data),
-  updateAttendance: (id, data) => api.put(`/attendance/${id}/`, data),
+  updateAttendance: (id, data) => api.patch(`/attendance/${id}/`, data),
+  deleteAttendance: (id) => api.delete(`/attendance/${id}/`),
 
   // Leave Requests
   getLeaveRequests: (token) =>
@@ -115,6 +198,12 @@ export const hrapi = {
     }),
 
   // Performance
+  getPerformances: () => api.get('/performances/'),
+  createPerformance: (data) => api.post('/performances/', data),
+
+  // Payroll
+  getMySalary: () => api.get('/payroll/my-salary/'),
+  setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
   getPerformances: () => api.get('/performances/'),                     
   getPerformance: (id) => api.get(`/performances/${id}/`),              
   createPerformance: (data) => api.post('/performances/', data),        
@@ -129,6 +218,17 @@ export const hrapi = {
 
   updateReviewStatus: (id, status) => api.patch(`/performances/${id}/update_status/`, { status }),
   submitEmployeeFeedback: (id, feedback) => api.post(`/performances/${id}/feedback/`, { feedback }),
+
+  // Profile Management
+  updateMyProfile: (data) => api.patch('/employees/me/', data), // For users to update their own profile
+  updateEmployeeProfile: (id, data) => api.patch(`/employees/${id}/`, data), // For managers to update employee data
+  changePassword: (data) => api.post('/auth/change-password/', data),
+  getCurrentUser: () => api.get('/employees/me/'),
+  uploadProfilePicture: (formData) => api.patch('/employees/me/', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+  }),
 };
 
 export default api;

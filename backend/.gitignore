@@ -13,3 +13,5 @@ collectstatic
 
 __pycache__
 /client-sites
+
+.github/*
