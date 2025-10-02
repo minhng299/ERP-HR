@@ -70,6 +70,8 @@ class AttendanceSerializer(serializers.ModelSerializer):
     can_check_out = serializers.SerializerMethodField()
     can_start_break = serializers.SerializerMethodField()
     can_end_break = serializers.SerializerMethodField()
+    leave_type_display = serializers.SerializerMethodField()
+    is_on_leave = serializers.SerializerMethodField()
     
     # Override duration fields to handle serialization issues
     break_duration = serializers.SerializerMethodField()
@@ -85,12 +87,13 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'early_departure', 'overtime_hours', 'break_start', 'break_end',
             'expected_start', 'expected_end', 'hours_worked_display',
             'can_check_in', 'can_check_out', 'can_start_break', 'can_end_break',
+            'leave_request', 'leave_type_display', 'is_on_leave',
             'created_at', 'updated_at'
         ]
         read_only_fields = [
             'total_hours', 'late_arrival', 'early_departure', 'overtime_hours',
             'created_at', 'updated_at', 'status_display', 'hours_worked_display',
-            'break_duration'
+            'break_duration', 'leave_type_display', 'is_on_leave'
         ]
     
     def get_employee_name(self, obj):
@@ -173,6 +176,14 @@ class AttendanceSerializer(serializers.ModelSerializer):
     
     def get_can_end_break(self, obj):
         return obj.can_end_break()
+    
+    def get_leave_type_display(self, obj):
+        """Get leave type name if on leave"""
+        return obj.get_leave_type_display()
+    
+    def get_is_on_leave(self, obj):
+        """Check if attendance is for a leave day"""
+        return obj.is_on_leave()
 
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:

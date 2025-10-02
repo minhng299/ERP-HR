@@ -127,12 +127,26 @@ const EmployeeManagement = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this employee?')) return;
+    const employee = employees.find(emp => emp.id === id);
+    const employeeName = employee ? `${employee.user.first_name} ${employee.user.last_name}` : 'this employee';
+    
+    if (!window.confirm(`Are you sure you want to delete ${employeeName}?\n\nThis will permanently delete both the employee record and their user account.`)) return;
+    
     try {
-      await hrapi.deleteEmployee(id);
+      const response = await hrapi.deleteEmployee(id);
       setEmployees(prev => prev.filter(emp => emp.id !== id));
+      
+      // Show success message
+      if (response.data && response.data.message) {
+        console.log('✅', response.data.message);
+        // You could add a toast notification here
+      } else {
+        console.log('✅', `Employee ${employeeName} deleted successfully`);
+      }
     } catch (err) {
       console.error('Failed to delete employee:', err);
+      const errorMessage = err.response?.data?.error || 'Failed to delete employee';
+      alert(`Error: ${errorMessage}`);
     }
   };
 
@@ -154,14 +168,40 @@ const EmployeeManagement = () => {
   };
 
   const handleBulkDelete = async () => {
-    if (!window.confirm(`Are you sure you want to delete ${selectedEmployees.length} employees?`)) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedEmployees.length} employees?\n\nThis will permanently delete both employee records and their user accounts.`)) return;
+    
     try {
-      await Promise.all(selectedEmployees.map(id => hrapi.deleteEmployee(id)));
-      setEmployees(prev => prev.filter(emp => !selectedEmployees.includes(emp.id)));
+      const deletePromises = selectedEmployees.map(async (id) => {
+        try {
+          const response = await hrapi.deleteEmployee(id);
+          return { success: true, id, message: response.data?.message };
+        } catch (error) {
+          return { success: false, id, error: error.response?.data?.error || 'Unknown error' };
+        }
+      });
+      
+      const results = await Promise.all(deletePromises);
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+      
+      // Update UI for successful deletions
+      if (successful.length > 0) {
+        const successfulIds = successful.map(r => r.id);
+        setEmployees(prev => prev.filter(emp => !successfulIds.includes(emp.id)));
+        console.log(`✅ Successfully deleted ${successful.length} employees`);
+      }
+      
+      // Show errors for failed deletions
+      if (failed.length > 0) {
+        const errorMessages = failed.map(r => `Employee ID ${r.id}: ${r.error}`).join('\n');
+        alert(`Some deletions failed:\n\n${errorMessages}`);
+      }
+      
       setSelectedEmployees([]);
       setShowBulkActions(false);
     } catch (err) {
       console.error('Failed to delete employees:', err);
+      alert('An unexpected error occurred during bulk deletion');
     }
   };
 
@@ -691,7 +731,7 @@ const EmployeeManagement = () => {
                 
                 <div className="flex justify-end space-x-2">
                   <button
-                    className="btn btn-secondary btn-sm"
+                    className="btn btn-secondary btn-lg"
                     onClick={() => navigate(`/employees/${employee.id}`)}
                   >
                     <Eye className="h-4 w-4" />
@@ -700,14 +740,14 @@ const EmployeeManagement = () => {
                   {user.role === 'manager' && (
                     <>
                       <button 
-                        className="btn btn-success btn-sm"
+                        className="btn btn-success btn-lg"
                         onClick={() => setEditingEmployee(employee)}
                       >
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-6 w-6" />
                         Edit
                       </button>
                       <button 
-                        className="btn btn-error btn-sm"
+                        className="btn btn-error btn-lg"
                         onClick={() => handleDelete(employee.id)}
                       >
                         <Trash2 className="h-4 w-4" />
