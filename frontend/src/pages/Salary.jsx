@@ -19,6 +19,7 @@ const Salary = () => {
   }, []);
 
   if (loading) return <div className="p-6">Loading salary...</div>;
+  console.log(salary);
   if (error) return <div className="p-6 text-red-500">Failed to load salary data.</div>;
   if (!salary) return <div className="p-6">No salary data available.</div>;
 
