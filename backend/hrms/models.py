@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
+from datetime import time
 
 
 class Department(models.Model):
@@ -61,25 +62,140 @@ class Employee(models.Model):
         return self.department.name if self.department else None
 
 class Attendance(models.Model):
+    STATUS_CHOICES = [
+        ('not_started', 'Not Started'),
+        ('checked_in', 'Checked In'),
+        ('on_break', 'On Break'),
+        ('checked_out', 'Checked Out'),
+        ('incomplete', 'Incomplete'),
+    ]
+    
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     date = models.DateField()
-    check_in = models.TimeField()
+    check_in = models.TimeField(null=True, blank=True)
     check_out = models.TimeField(null=True, blank=True)
     break_duration = models.DurationField(default='00:00:00')
     total_hours = models.DurationField(null=True, blank=True)
     notes = models.TextField(blank=True)
     
+    # New fields for enhanced tracking
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='not_started')
+    location = models.CharField(max_length=255, blank=True, help_text='IP address or location info')
+    late_arrival = models.BooleanField(default=False)
+    early_departure = models.BooleanField(default=False)
+    overtime_hours = models.DurationField(null=True, blank=True)
+    
+    # Break tracking
+    break_start = models.TimeField(null=True, blank=True)
+    break_end = models.TimeField(null=True, blank=True)
+    
+    # Expected work schedule (can be overridden per employee)
+    expected_start = models.TimeField(default=time(9, 0))
+    expected_end = models.TimeField(default=time(17, 0))
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
     class Meta:
         unique_together = ('employee', 'date')
+        ordering = ['-date', '-created_at']
     
     def save(self, *args, **kwargs):
+        # Auto-calculate total hours if both check_in and check_out exist
         if self.check_in and self.check_out:
             from datetime import datetime, timedelta
             check_in_dt = datetime.combine(self.date, self.check_in)
             check_out_dt = datetime.combine(self.date, self.check_out)
             total = check_out_dt - check_in_dt - self.break_duration
             self.total_hours = total
+            
+            # Calculate overtime
+            expected_duration = datetime.combine(self.date, self.expected_end) - datetime.combine(self.date, self.expected_start)
+            if total > expected_duration:
+                self.overtime_hours = total - expected_duration
+            
+            # Check for early departure
+            if self.check_out < self.expected_end:
+                self.early_departure = True
+            
+            # Update status to checked_out
+            self.status = 'checked_out'
+        
+        # Check for late arrival when check_in is set
+        if self.check_in and self.check_in > self.expected_start:
+            self.late_arrival = True
+            
         super().save(*args, **kwargs)
+    
+    def is_late(self):
+        """Check if employee arrived late"""
+        return self.check_in and self.check_in > self.expected_start
+    
+    def is_early_departure(self):
+        """Check if employee left early"""
+        return self.check_out and self.check_out < self.expected_end
+    
+    def get_work_duration(self):
+        """Get actual work duration excluding breaks"""
+        if self.check_in and self.check_out:
+            from datetime import datetime
+            check_in_dt = datetime.combine(self.date, self.check_in)
+            check_out_dt = datetime.combine(self.date, self.check_out)
+            return check_out_dt - check_in_dt - self.break_duration
+        return None
+    
+    def get_status_display_with_time(self):
+        try:
+            if self.status == 'checked_in' and self.check_in:
+                local_time = self.check_in
+                return f"Checked In at {local_time.strftime('%I:%M %p')}"
+            elif self.status == 'checked_out' and self.check_out:
+                local_time = self.check_out
+                return f"Checked Out at {local_time.strftime('%I:%M %p')}"
+            elif self.status == 'on_break' and self.break_start:
+                local_time = self.break_start
+                return f"On Break since {local_time.strftime('%I:%M %p')}"
+            return self.get_status_display()
+        except Exception as e:
+            return self.get_status_display()
+    
+    def can_check_in(self):
+        """Check if employee can check in"""
+        return self.status in ['not_started', 'incomplete']
+    
+    def can_check_out(self):
+        """Check if employee can check out"""
+        return self.status in ['checked_in', 'on_break']
+    
+    def can_start_break(self):
+        """Check if employee can start break"""
+        return self.status == 'checked_in'
+    
+    def can_end_break(self):
+        """Check if employee can end break"""
+        return self.status == 'on_break'
+    
+    def __str__(self):
+        return f"{self.employee.user.get_full_name()} - {self.date} ({self.get_status_display()})"
+
+    @property
+    def hours_worked_display(self):
+        """Display total hours in readable format"""
+        try:
+            if self.total_hours:
+                if hasattr(self.total_hours, 'total_seconds'):
+                    # It's a proper timedelta object
+                    total_seconds = int(self.total_hours.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    return f"{hours}h {minutes}m"
+                else:
+                    # It might be a string, try to parse it or return as is
+                    return str(self.total_hours)
+            return "0h 0m"
+        except Exception as e:
+            return "0h 0m"
 
 class LeaveType(models.Model):
     name = models.CharField(max_length=50, unique=True)

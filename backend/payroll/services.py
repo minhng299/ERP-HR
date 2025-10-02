@@ -30,11 +30,13 @@ class PayrollService:
         bonus = 0
 
         # Tính lại lương, deductions, bonus cho tháng hiện tại
-        late_days, absent_days, num_days = PayrollService.get_late_or_absent_days(employee, month)
-        deductions = (late_days + absent_days) * penalty_per_day
+        late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
+        overtime_bonus = PayrollService.calculate_overtime_bonus(employee, month)
+        # Apply 50% penalty for incomplete days
+        deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
         total_salary = PayrollService.calculate_salary(
             base_salary=new_salary,
-            bonus=bonus,
+            bonus=bonus + overtime_bonus,
             month=month,
             employee_id=employee.id,
             penalty_per_day=penalty_per_day
@@ -44,16 +46,26 @@ class PayrollService:
             month=month,
             defaults={
                 "base_salary": new_salary,
-                "bonus": bonus,
+                "bonus": bonus + overtime_bonus,
                 "deductions": deductions,
-                "total_salary": total_salary
+                "total_salary": total_salary,
+                "total_hours_worked": PayrollService.get_total_hours_worked(employee, month),
+                "overtime_hours": overtime_bonus / 50000 if overtime_bonus > 0 else 0,
+                "late_days": late_days,
+                "absent_days": absent_days,
+                "incomplete_days": incomplete_days
             }
         )
         # Luôn cập nhật lại các trường lương
         record.base_salary = new_salary
-        record.bonus = bonus
+        record.bonus = bonus + overtime_bonus
         record.deductions = deductions
         record.total_salary = total_salary
+        record.total_hours_worked = PayrollService.get_total_hours_worked(employee, month)
+        record.overtime_hours = overtime_bonus / 50000 if overtime_bonus > 0 else 0
+        record.late_days = late_days
+        record.absent_days = absent_days
+        record.incomplete_days = incomplete_days
         record.save()
         return employee
         
@@ -98,11 +110,15 @@ class PayrollService:
             if (calc_start + timedelta(days=i)).weekday() < 5
         ]
         
-        num_days = len(working_days)
+        # Only consider working days up to today (don't count future days as absent)
+        today = date.today()
+        working_days_up_to_today = [d for d in working_days if d <= today]
+        
+        num_days = len(working_days_up_to_today)
 
         late_days = sum(
             1 for a in attendances 
-            if a.check_in and a.check_in > time(8, 0)
+            if a.check_in and a.check_in > a.expected_start
         )
         
         # print("DEBUG attended_dates:", attended_dates)
@@ -122,10 +138,100 @@ class PayrollService:
             for i in range(days):
                 approved_leave_days.add(lr.start_date + timedelta(days=i))
         # absent_days chỉ tính những ngày không đi làm và không có đơn nghỉ được duyệt
-        absent_days = sum(1 for d in working_days if d not in attended_dates and d not in approved_leave_days)
+        # Only count working days up to today, not future days
+        absent_days = sum(1 for d in working_days_up_to_today if d not in attended_dates and d not in approved_leave_days)
         
-        print(f"DEBUG late_days={late_days}, absent_days={absent_days}, num_days={num_days}")
-        return late_days, absent_days, num_days
+        # Add incomplete attendance days as partial penalty
+        incomplete_days = PayrollService.get_incomplete_attendance_days(employee, month)
+        
+        print(f"DEBUG late_days={late_days}, absent_days={absent_days}, incomplete_days={incomplete_days}, num_days={num_days}")
+        print(f"DEBUG approved_leave_days count: {len(approved_leave_days)}")
+        print(f"DEBUG attended_dates count: {len(attended_dates)}")
+        print(f"DEBUG working_days_up_to_today count: {len(working_days_up_to_today)}")
+        print(f"DEBUG today: {today}, calc_start: {calc_start}, calc_end: {calc_end}")
+        return late_days, absent_days, num_days, incomplete_days
+
+    @staticmethod
+    def calculate_overtime_bonus(employee, month, hourly_overtime_rate=50000):
+        """Calculate overtime bonus based on attendance overtime_hours"""
+        start_month = month.replace(day=1)
+        if month.month == 12:
+            next_month = date(month.year+1, 1, 1)
+        else:
+            next_month = date(month.year, month.month+1, 1)
+
+        attendances = Attendance.objects.filter(
+            employee=employee,
+            date__gte=start_month,
+            date__lt=next_month,
+            overtime_hours__isnull=False
+        )
+
+        total_overtime_hours = 0
+        for attendance in attendances:
+            if attendance.overtime_hours:
+                # Convert timedelta to hours
+                if hasattr(attendance.overtime_hours, 'total_seconds'):
+                    total_overtime_hours += attendance.overtime_hours.total_seconds() / 3600
+                else:
+                    # Handle string format if needed
+                    try:
+                        h, m, s = str(attendance.overtime_hours).split(':')
+                        total_overtime_hours += int(h) + int(m)/60 + int(s)/3600
+                    except:
+                        pass
+
+        return int(total_overtime_hours * hourly_overtime_rate)
+
+    @staticmethod
+    def get_incomplete_attendance_days(employee, month):
+        """Count days with incomplete attendance (checked in but not out)"""
+        start_month = month.replace(day=1)
+        if month.month == 12:
+            next_month = date(month.year+1, 1, 1)
+        else:
+            next_month = date(month.year, month.month+1, 1)
+
+        incomplete_attendances = Attendance.objects.filter(
+            employee=employee,
+            date__gte=start_month,
+            date__lt=next_month,
+            status='incomplete'
+        ).count()
+
+        return incomplete_attendances
+
+    @staticmethod
+    def get_total_hours_worked(employee, month):
+        """Calculate total hours worked in the month"""
+        start_month = month.replace(day=1)
+        if month.month == 12:
+            next_month = date(month.year+1, 1, 1)
+        else:
+            next_month = date(month.year, month.month+1, 1)
+
+        attendances = Attendance.objects.filter(
+            employee=employee,
+            date__gte=start_month,
+            date__lt=next_month,
+            total_hours__isnull=False
+        )
+
+        total_hours = 0
+        for attendance in attendances:
+            if attendance.total_hours:
+                # Convert timedelta to hours
+                if hasattr(attendance.total_hours, 'total_seconds'):
+                    total_hours += attendance.total_hours.total_seconds() / 3600
+                else:
+                    # Handle string format if needed
+                    try:
+                        h, m, s = str(attendance.total_hours).split(':')
+                        total_hours += int(h) + int(m)/60 + int(s)/3600
+                    except:
+                        pass
+
+        return round(total_hours, 2)
 
     @staticmethod
     def calculate_base_salary(base_salary, num_days, is_new_employee):
@@ -142,7 +248,7 @@ class PayrollService:
     @staticmethod
     def calculate_salary(base_salary, bonus, month, employee_id, penalty_per_day=100000):
         employee = Employee.objects.get(pk=employee_id)
-        late_days, absent_days, num_days = PayrollService.get_late_or_absent_days(employee, month)
+        late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
 
         start_month = month.replace(day=1)
         if employee.hire_date >= start_month:
@@ -151,7 +257,8 @@ class PayrollService:
             is_new_employee = False
 
         base_salary_calc = PayrollService.calculate_base_salary(base_salary, num_days, is_new_employee)
-        deductions = (late_days + absent_days) * penalty_per_day
+        # Include incomplete days penalty (50% of full penalty)
+        deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
 
             # --- Leave Penalty Logic ---
         from hrms.models import LeaveRequest, LeavePenalty
@@ -192,10 +299,10 @@ class PayrollService:
         employee = Employee.objects.get(pk=employee_id)
 
         # Lấy số ngày đi muộn, nghỉ, số ngày công
-        late_days, absent_days, num_days = PayrollService.get_late_or_absent_days(employee, month)
+        late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
 
-        # Tính deductions chuẩn từ late + absent
-        deductions = (late_days + absent_days) * penalty_per_day
+        # Tính deductions chuẩn từ late + absent + incomplete (50% penalty)
+        deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
 
         # Xác định nhân viên mới hay cũ
         start_month = month.replace(day=1)
@@ -246,9 +353,14 @@ class PayrollService:
             employee_id=employee_id,
             base_salary=base_salary_calc,
             bonus=bonus,
-            deductions=deductions + penalty_total,   # <- lấy từ get_late_or_absent_days
+            deductions=deductions + penalty_total,
             total_salary=total_salary,
-            month=month
+            month=month,
+            total_hours_worked=PayrollService.get_total_hours_worked(employee, month),
+            overtime_hours=PayrollService.calculate_overtime_bonus(employee, month) / 50000,
+            late_days=late_days,
+            absent_days=absent_days,
+            incomplete_days=incomplete_days
         )
         return record
 

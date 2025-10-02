@@ -63,13 +63,116 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
 class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.SerializerMethodField()
+    department_name = serializers.SerializerMethodField()
+    status_display = serializers.SerializerMethodField()
+    hours_worked_display = serializers.SerializerMethodField()
+    can_check_in = serializers.SerializerMethodField()
+    can_check_out = serializers.SerializerMethodField()
+    can_start_break = serializers.SerializerMethodField()
+    can_end_break = serializers.SerializerMethodField()
+    
+    # Override duration fields to handle serialization issues
+    break_duration = serializers.SerializerMethodField()
+    total_hours = serializers.SerializerMethodField()
+    overtime_hours = serializers.SerializerMethodField()
     
     class Meta:
         model = Attendance
-        fields = '__all__'
+        fields = [
+            'id', 'employee', 'employee_name', 'department_name', 'date',
+            'check_in', 'check_out', 'break_duration', 'total_hours',
+            'notes', 'status', 'status_display', 'location', 'late_arrival',
+            'early_departure', 'overtime_hours', 'break_start', 'break_end',
+            'expected_start', 'expected_end', 'hours_worked_display',
+            'can_check_in', 'can_check_out', 'can_start_break', 'can_end_break',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'total_hours', 'late_arrival', 'early_departure', 'overtime_hours',
+            'created_at', 'updated_at', 'status_display', 'hours_worked_display',
+            'break_duration'
+        ]
     
     def get_employee_name(self, obj):
         return f"{obj.employee.user.first_name} {obj.employee.user.last_name}"
+    
+    def get_department_name(self, obj):
+        return obj.employee.department.name if obj.employee.department else None
+    
+    def get_status_display(self, obj):
+        try:
+            return obj.get_status_display_with_time()
+        except:
+            return obj.get_status_display()
+    
+    def get_hours_worked_display(self, obj):
+        try:
+            return obj.hours_worked_display
+        except:
+            return "0h 0m"
+    
+    def get_break_duration(self, obj):
+        """Safely serialize break_duration field"""
+        try:
+            if obj.break_duration:
+                if hasattr(obj.break_duration, 'total_seconds'):
+                    # It's a proper timedelta object
+                    total_seconds = int(obj.break_duration.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    return f"{hours:02d}:{minutes:02d}:00"
+                else:
+                    # It might be a string, return as is
+                    return str(obj.break_duration)
+            return "00:00:00"
+        except:
+            return "00:00:00"
+    
+    def get_total_hours(self, obj):
+        """Safely serialize total_hours field"""
+        try:
+            if obj.total_hours:
+                if hasattr(obj.total_hours, 'total_seconds'):
+                    # It's a proper timedelta object
+                    total_seconds = int(obj.total_hours.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    return f"{hours:02d}:{minutes:02d}:00"
+                else:
+                    # It might be a string, return as is
+                    return str(obj.total_hours)
+            return None
+        except:
+            return None
+    
+    def get_overtime_hours(self, obj):
+        """Safely serialize overtime_hours field"""
+        try:
+            if obj.overtime_hours:
+                if hasattr(obj.overtime_hours, 'total_seconds'):
+                    # It's a proper timedelta object
+                    total_seconds = int(obj.overtime_hours.total_seconds())
+                    hours = total_seconds // 3600
+                    minutes = (total_seconds % 3600) // 60
+                    return f"{hours:02d}:{minutes:02d}:00"
+                else:
+                    # It might be a string, return as is
+                    return str(obj.overtime_hours)
+            return None
+        except:
+            return None
+    
+    def get_can_check_in(self, obj):
+        return obj.can_check_in()
+    
+    def get_can_check_out(self, obj):
+        return obj.can_check_out()
+    
+    def get_can_start_break(self, obj):
+        return obj.can_start_break()
+    
+    def get_can_end_break(self, obj):
+        return obj.can_end_break()
 
 class LeaveTypeSerializer(serializers.ModelSerializer):
     class Meta:
