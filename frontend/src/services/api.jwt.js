@@ -128,10 +128,24 @@ export const hrapi = {
   createPosition: (data) => api.post('/positions/', data),
 
   // Attendance
-  getAttendance: () => api.get('/attendance/'),
+  getAttendance: (params = {}) => {
+    const queryString = new URLSearchParams(params).toString();
+    return api.get(`/attendance/${queryString ? '?' + queryString : ''}`);
+  },
   getTodayAttendance: () => api.get('/attendance/today/'),
+  getAttendanceStats: () => api.get('/attendance/stats/'),
+  getCurrentStatus: () => api.get('/attendance/current_status/'),
+  
+  // Real-time attendance actions
+  checkIn: () => api.post('/attendance/check_in/'),
+  checkOut: () => api.post('/attendance/check_out/'),
+  startBreak: () => api.post('/attendance/start_break/'),
+  endBreak: () => api.post('/attendance/end_break/'),
+  
+  // Traditional CRUD for managers
   createAttendance: (data) => api.post('/attendance/', data),
-  updateAttendance: (id, data) => api.put(`/attendance/${id}/`, data),
+  updateAttendance: (id, data) => api.patch(`/attendance/${id}/`, data),
+  deleteAttendance: (id) => api.delete(`/attendance/${id}/`),
 
   // Leave Requests
   getLeaveRequests: (token) =>
