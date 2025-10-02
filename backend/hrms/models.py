@@ -3,9 +3,9 @@ from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.core.exceptions import ValidationError
 from django.utils.text import slugify
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, post_delete
 from django.dispatch import receiver
-from datetime import time
+from datetime import time, timedelta
 
 
 class Department(models.Model):
@@ -68,13 +68,14 @@ class Attendance(models.Model):
         ('on_break', 'On Break'),
         ('checked_out', 'Checked Out'),
         ('incomplete', 'Incomplete'),
+        ('on_leave', 'On Leave'),
     ]
     
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
     date = models.DateField()
     check_in = models.TimeField(null=True, blank=True)
     check_out = models.TimeField(null=True, blank=True)
-    break_duration = models.DurationField(default='00:00:00')
+    break_duration = models.DurationField(default=timedelta(hours=0))
     total_hours = models.DurationField(null=True, blank=True)
     notes = models.TextField(blank=True)
     
@@ -92,6 +93,9 @@ class Attendance(models.Model):
     # Expected work schedule (can be overridden per employee)
     expected_start = models.TimeField(default=time(9, 0))
     expected_end = models.TimeField(default=time(17, 0))
+    
+    # Leave integration
+    leave_request = models.ForeignKey('LeaveRequest', on_delete=models.SET_NULL, null=True, blank=True, help_text='Associated leave request if on leave')
     
     # Timestamps
     created_at = models.DateTimeField(auto_now_add=True)
@@ -156,6 +160,8 @@ class Attendance(models.Model):
             elif self.status == 'on_break' and self.break_start:
                 local_time = self.break_start
                 return f"On Break since {local_time.strftime('%I:%M %p')}"
+            elif self.status == 'on_leave' and self.leave_request:
+                return f"On {self.leave_request.leave_type.name} Leave"
             return self.get_status_display()
         except Exception as e:
             return self.get_status_display()
@@ -175,6 +181,51 @@ class Attendance(models.Model):
     def can_end_break(self):
         """Check if employee can end break"""
         return self.status == 'on_break'
+    
+    def is_on_leave(self):
+        """Check if employee is on approved leave for this date"""
+        if self.leave_request and self.leave_request.status == 'approved':
+            return self.leave_request.start_date <= self.date <= self.leave_request.end_date
+        return False
+    
+    def get_leave_type_display(self):
+        """Get the leave type name if on leave"""
+        if self.is_on_leave():
+            return self.leave_request.leave_type.name
+        return None
+    
+    @classmethod
+    def create_leave_attendance(cls, employee, leave_request):
+        """Create attendance records for approved leave days"""
+        from datetime import timedelta
+        attendances = []
+        current_date = leave_request.start_date
+        
+        while current_date <= leave_request.end_date:
+            # Only create for working days (Monday to Friday)
+            if current_date.weekday() < 5:  # 0-4 are Monday to Friday
+                attendance, created = cls.objects.get_or_create(
+                    employee=employee,
+                    date=current_date,
+                    defaults={
+                        'status': 'on_leave',
+                        'leave_request': leave_request,
+                        'notes': f'On {leave_request.leave_type.name} leave',
+                        'break_duration': timedelta(hours=0),
+                        'total_hours': None,
+                        'overtime_hours': None
+                    }
+                )
+                if not created and attendance.status in ['not_started', 'incomplete']:
+                    # Update existing record to leave status
+                    attendance.status = 'on_leave'
+                    attendance.leave_request = leave_request
+                    attendance.notes = f'On {leave_request.leave_type.name} leave'
+                    attendance.save()
+                attendances.append(attendance)
+            current_date += timedelta(days=1)
+        
+        return attendances
     
     def __str__(self):
         return f"{self.employee.user.get_full_name()} - {self.date} ({self.get_status_display()})"
@@ -250,10 +301,36 @@ class LeaveRequest(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        
+        # Track if this is a status change to approved
+        was_approved = False
+        if self.pk:
+            old_instance = LeaveRequest.objects.get(pk=self.pk)
+            was_approved = old_instance.status != 'approved' and self.status == 'approved'
+        else:
+            was_approved = self.status == 'approved'
+        
         if self.status == 'approved' and self.response_date and self.approved_by:
             if self.leave_type.code == 'AL':  # Annual Leave
                 self.employee.annual_leave_remaining -= self.days_requested
                 self.employee.save()
+            
+            # Create attendance records for approved leave days
+            if was_approved:
+                Attendance.create_leave_attendance(self.employee, self)
+        
+        # If leave was rejected or cancelled, remove leave status from attendance
+        elif self.status in ['rejected', 'cancelled'] and self.pk:
+            Attendance.objects.filter(
+                employee=self.employee,
+                leave_request=self,
+                status='on_leave'
+            ).update(
+                status='not_started',
+                leave_request=None,
+                notes=''
+            )
+        
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -345,4 +422,31 @@ class Performance(models.Model):
             new_status = self.status
             if new_status not in valid_transitions[prev_status]:
                 raise ValidationError(f"Invalid status transition from {prev_status} to {new_status}.")
+
+
+# Signal handlers for proper cleanup
+@receiver(post_delete, sender=Employee)
+def delete_user_on_employee_delete(sender, instance, **kwargs):
+    """
+    When an Employee is deleted, also delete the associated User.
+    This ensures no orphaned User records remain.
+    """
+    try:
+        if instance.user:
+            instance.user.delete()
+    except User.DoesNotExist:
+        # User was already deleted, nothing to do
+        pass
+
+
+@receiver(pre_save, sender=Employee)
+def prevent_duplicate_users(sender, instance, **kwargs):
+    """
+    Prevent creating employees with users that are already associated with other employees.
+    """
+    if instance.user:
+        # Check if this user is already associated with another employee
+        existing_employee = Employee.objects.filter(user=instance.user).exclude(pk=instance.pk).first()
+        if existing_employee:
+            raise ValidationError(f"User {instance.user.username} is already associated with employee {existing_employee.employee_id}")
 

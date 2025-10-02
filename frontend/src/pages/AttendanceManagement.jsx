@@ -115,7 +115,8 @@ const AttendanceManagement = () => {
       'checked_in': 'bg-green-100 text-green-800',
       'on_break': 'bg-yellow-100 text-yellow-800',
       'checked_out': 'bg-blue-100 text-blue-800',
-      'incomplete': 'bg-red-100 text-red-800'
+      'incomplete': 'bg-red-100 text-red-800',
+      'on_leave': 'bg-purple-100 text-purple-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -175,12 +176,21 @@ const AttendanceManagement = () => {
             <div className="text-center md:text-left mb-4 md:mb-0">
               <h2 className="text-xl font-semibold mb-2">Today's Status</h2>
               <div className="text-2xl font-bold">
-                {/* Display current attendance status
-                  Checked In at 07:58 get the time and format then join
-                */}
-                {currentStatus.attendance.status_display || 'Not Started'}
+                {/* Handle both regular attendance and leave status */}
+                {currentStatus.status === 'on_leave' 
+                  ? currentStatus.message || 'On Leave'
+                  : (currentStatus.attendance?.status_display || currentStatus.message || 'Not Started')
+                }
               </div>
-              {currentStatus.attendance.late_arrival && (
+              {/* Show leave information if on leave */}
+              {currentStatus.status === 'on_leave' && currentStatus.leave_type && (
+                <div className="text-blue-200 mt-1">
+                  <Calendar className="inline h-4 w-4 mr-1" />
+                  {currentStatus.leave_type} - {currentStatus.leave_dates}
+                </div>
+              )}
+              {/* Show late arrival flag for regular attendance */}
+              {currentStatus.attendance?.late_arrival && (
                 <div className="text-yellow-200 mt-1">
                   <AlertCircle className="inline h-4 w-4 mr-1" />
                   Late Arrival
@@ -325,6 +335,7 @@ const AttendanceManagement = () => {
               <option value="on_break">On Break</option>
               <option value="checked_out">Checked Out</option>
               <option value="incomplete">Incomplete</option>
+              <option value="on_leave">On Leave</option>
             </select>
           </div>
           
@@ -391,7 +402,10 @@ const AttendanceManagement = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(record.status)}`}>
-                      {record.status_display || record.status}
+                      {record.status === 'on_leave' && record.leave_type_display 
+                        ? `On ${record.leave_type_display} Leave`
+                        : (record.status_display || record.status)
+                      }
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -433,7 +447,10 @@ const AttendanceManagement = () => {
                   </div>
                 )}
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(record.status)}`}>
-                  {record.status_display || record.status}
+                  {record.status === 'on_leave' && record.leave_type_display 
+                    ? `On ${record.leave_type_display} Leave`
+                    : (record.status_display || record.status)
+                  }
                 </span>
               </div>
               

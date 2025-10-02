@@ -113,6 +113,35 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             'recent_hires': recent_hires,
             'pending_leaves': pending_leaves,
         })
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Custom delete method to ensure proper cleanup of User and related data
+        """
+        employee = self.get_object()
+        
+        # Store user reference before deletion
+        user = employee.user
+        
+        # Check if user has permission to delete this employee
+        if request.user.employee.role != 'manager':
+            return Response({'error': 'Only managers can delete employees'}, 
+                          status=status.HTTP_403_FORBIDDEN)
+        
+        # Prevent self-deletion
+        if employee.user == request.user:
+            return Response({'error': 'Cannot delete your own employee record'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            # Delete the employee (this will trigger the signal to delete the user)
+            employee.delete()
+            
+            return Response({'message': f'Employee {employee.employee_id} and associated user account deleted successfully'}, 
+                          status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': f'Failed to delete employee: {str(e)}'}, 
+                          status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class AttendanceViewSet(viewsets.ModelViewSet):
     queryset = Attendance.objects.select_related('employee__user', 'employee__department').all()
@@ -154,6 +183,21 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         today = timezone.now().date()
         current_time = timezone.now().time()
         
+        # Check if employee is on approved leave today
+        approved_leave = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__lte=today,
+            end_date__gte=today
+        ).first()
+        
+        if approved_leave:
+            return Response({
+                'error': f'Cannot check in while on {approved_leave.leave_type.name} leave',
+                'leave_type': approved_leave.leave_type.name,
+                'leave_dates': f'{approved_leave.start_date} to {approved_leave.end_date}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
         # Get or create attendance record for today
         attendance, created = Attendance.objects.get_or_create(
             employee=employee,
@@ -169,7 +213,12 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         )
         
         if not created:
-            if attendance.status == 'checked_in':
+            if attendance.status == 'on_leave':
+                return Response({
+                    'error': 'Cannot check in while on leave',
+                    'leave_type': attendance.get_leave_type_display()
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif attendance.status == 'checked_in':
                 return Response({'error': 'Already checked in today'}, 
                               status=status.HTTP_400_BAD_REQUEST)
             elif attendance.status == 'checked_out':
@@ -186,7 +235,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         
         return Response({
             'message': 'Checked in successfully',
-            'time': current_time.strftime('%H:%M'),
+            'time': current_time.strftime('%I:%M %p'),
             'is_late': attendance.is_late(),
             'attendance': serializer.data
         })
@@ -325,6 +374,28 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         
         today = timezone.now().date()
         
+        # Check if employee is on approved leave today
+        approved_leave = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__lte=today,
+            end_date__gte=today
+        ).first()
+        
+        if approved_leave:
+            return Response({
+                'status': 'on_leave',
+                'message': f'You are on {approved_leave.leave_type.name} leave',
+                'leave_type': approved_leave.leave_type.name,
+                'leave_dates': f'{approved_leave.start_date} to {approved_leave.end_date}',
+                'can_check_in': False,
+                'can_check_out': False,
+                'can_start_break': False,
+                'can_end_break': False,
+                'attendance': None,
+                'current_time': timezone.now().time().strftime('%I:%M %p')
+            })
+        
         try:
             attendance = Attendance.objects.get(employee=employee, date=today)
             serializer = self.get_serializer(attendance)
@@ -339,7 +410,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'can_check_out': attendance.can_check_out(),
             'can_start_break': attendance.can_start_break(),
             'can_end_break': attendance.can_end_break(),
-            'current_time': timezone.now().time().strftime('%H:%M')
+            'current_time': timezone.now().time().strftime('%I:%M %p')
         })
     
     @action(detail=False, methods=['get'])
