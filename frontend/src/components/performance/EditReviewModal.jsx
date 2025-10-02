@@ -5,7 +5,6 @@ import { hrapi } from "../../services/api.jwt";
 const EditReviewModal = ({ isOpen, onClose, review, onUpdated, role }) => {
   const [formData, setFormData] = useState({});
   const [errors, setErrors] = useState({});
-  // Loại bỏ overall_rating vì backend tự tính
   const ratingFields = ["goals_achievement", "communication", "teamwork", "initiative"];
 
   useEffect(() => {

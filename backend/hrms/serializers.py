@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 class UserSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)

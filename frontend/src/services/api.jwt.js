@@ -123,7 +123,7 @@ export const hrapi = {
 
   getMyReviews: () => api.get('/performances/my_reviews/'),            
   getPerformancesByStatus: (status) => api.get(`/performances/by_status/?status=${status}`), 
-  getPerformanceAnalytics: () => api.get('/performances/analytics/'),  
+  getPerformanceAnalytics: () => api.get('/performances/analytics/'), 
   getReviewHistory: (id) => api.get(`/performances/${id}/review_history/`), 
   exportPerformancePDF: (id) => api.get(`/performances/${id}/export_pdf/`, { responseType: 'blob' }),
 

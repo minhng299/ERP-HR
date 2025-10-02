@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import NewReviewModal from "../components/performance/NewReviewModal";
 import EditReviewModal from "../components/performance/EditReviewModal";
 import ViewReviewModal from "../components/performance/ViewReviewModal";
+import AnalyticsModal from "../components/performance/AnalyticsModal";
 
 const PerformanceManagement = () => {
   const { user } = useAuth();
@@ -16,7 +17,20 @@ const PerformanceManagement = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedReview, setSelectedReview] = useState(null);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [period, setPeriod] = useState("month");
+  const [periodAnalytics, setPeriodAnalytics] = useState([]);
 
+  const fetchPeriodAnalytics = async (p = period) => {
+    try {
+      let res = await hrapi.getPerformanceAnalyticsByPeriod(p);
+      // DRF pagination => results
+      setPeriodAnalytics(res.data.results || res.data); 
+    } catch (err) {
+      console.error("Failed to fetch period analytics:", err);
+    }
+  };
+  
   const fetchPerformances = async () => {
     try {
       let token = getToken();
@@ -100,6 +114,15 @@ const PerformanceManagement = () => {
             <span>New Review</span>
           </button>
         )}
+        {/* <button
+          className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg"
+          onClick={() => {
+            fetchPeriodAnalytics();
+            setIsAnalyticsModalOpen(true);
+          }}
+        >
+          Analytics
+        </button> */}
       </div>
 
       {/* Filters */}
@@ -128,6 +151,18 @@ const PerformanceManagement = () => {
             className="border border-gray-300 rounded-lg px-4 py-2"
           />
         </div>
+{/* 
+        <div>
+        <button
+          className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg"
+          onClick={() => {
+            fetchPeriodAnalytics();
+            setIsAnalyticsModalOpen(true);
+          }}
+        >
+          Analytics
+        </button>
+        </div> */}
       </div>
 
       {/* Performance Overview */}
@@ -279,6 +314,14 @@ const PerformanceManagement = () => {
         onClose={() => setIsViewModalOpen(false)}
         review={selectedReview}
       />
+      {/* <AnalyticsModal
+        isOpen={isAnalyticsModalOpen}
+        onClose={() => setIsAnalyticsModalOpen(false)}
+        period={period}
+        setPeriod={setPeriod}
+        data={periodAnalytics}
+        fetchData={fetchPeriodAnalytics}
+      /> */}
     </div>
   );
 };

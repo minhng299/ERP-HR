@@ -5,9 +5,9 @@ const ViewReviewModal = ({ isOpen, onClose, review }) => {
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
+    return date.toLocaleDateString("en-US", {
       month: "2-digit",
+      day: "2-digit",
       year: "numeric",
     });
   };
@@ -20,7 +20,7 @@ const ViewReviewModal = ({ isOpen, onClose, review }) => {
           <p><strong>Employee:</strong> {review.employee_name}</p>
           <p><strong>Reviewer:</strong> {review.reviewer_name}</p>
           <p>
-            <strong>Period (Day/Month/Year):</strong>{" "}
+            <strong>Period:</strong>{" "}
             {formatDate(review.review_period_start)} →{" "}
             {formatDate(review.review_period_end)}
           </p>
