@@ -4,9 +4,12 @@ from hrms.models import Department, Position, Employee, LeaveType, Performance, 
 from datetime import date, time, timedelta, datetime
 
 class Command(BaseCommand):
-    # Chỉ xóa dữ liệu Attendance để đảm bảo tạo mới
+    help = 'Initialize database with sample data including enhanced attendance records'
+    
     def handle(self, *args, **options):
+        # Delete existing attendance data to ensure clean state
         Attendance.objects.all().delete()
+        self.stdout.write('Cleared existing attendance data')
         # Create departments
         departments = [
             {'name': 'Engineering', 'description': 'Software development and technical teams'},
@@ -82,51 +85,203 @@ class Command(BaseCommand):
             emp.save()
             emp_objs.append(emp)
 
-        # Tạo dữ liệu chấm công cho manager, employee1, employee2 từ 5/9 đến hôm nay
-        
+        # Create enhanced attendance data for manager, employee1, employee2 from Sep 5 to today
         start_date = date(2025, 9, 5)
-        end_date   = date(2025, 10, 1)
-
+        end_date = date(2025, 10, 2)  # Current date
+        
         delta = (end_date - start_date).days + 1
         work_days = [start_date + timedelta(days=i) for i in range(delta)]
-        # manager: vắng ngày 7, còn lại đi làm đúng giờ
+        
+        # Standard work schedule (8 AM - 5 PM with 1 hour lunch break)
+        standard_check_in = time(8, 0)
+        standard_check_out = time(17, 0)
+        lunch_break_duration = timedelta(hours=1)
+        
+        # Manager attendance: absent on 7th, on time otherwise
+        self.stdout.write('Creating manager attendance records...')
         for d in work_days:
-            if d.day != 7:
+            # Skip weekends (assuming Saturday=5, Sunday=6)
+            if d.weekday() >= 5:
+                continue
+                
+            if d.day != 7:  # Present days
+                total_hours = timedelta(hours=8)  # 8 hours work day
+                overtime_hours = timedelta(hours=0)
+                
                 att, created = Attendance.objects.get_or_create(
                     employee=emp_objs[0],
                     date=d,
-                    check_in=time(8,0),
-                    check_out=time(17,0),
-                    break_duration=timedelta(hours=1),
+                    defaults={
+                        'check_in': standard_check_in,
+                        'check_out': standard_check_out,
+                        'total_hours': timedelta(hours=8),  # Use timedelta for duration field
+                        'break_duration': lunch_break_duration,
+                        'status': 'checked_out',
+                        'location': '192.168.1.100',  # Sample office IP
+                        'late_arrival': False,
+                        'early_departure': False,
+                        'overtime_hours': timedelta(hours=0),  # Use timedelta for duration field
+                        'break_start': time(12, 0),
+                        'break_end': time(13, 0),
+                    }
                 )
-                print(f"Manager attendance: {d} - created: {created}")
+                if created:
+                    self.stdout.write(f"  Created manager attendance for {d}")
             else:
-                print(f"Manager absent: {d}")
-        # employee1: vắng ngày 10, còn lại đi làm đúng giờ
+                self.stdout.write(f"  Manager absent on {d}")
+        
+        # Employee1 attendance: absent on 10th, on time otherwise  
+        self.stdout.write('Creating employee1 attendance records...')
         for d in work_days:
-            if d.day != 10:
+            # Skip weekends
+            if d.weekday() >= 5:
+                continue
+                
+            if d.day != 10:  # Present days
+                total_hours = timedelta(hours=8)
+                overtime_hours = timedelta(hours=0)
+                
+                # Employee1 comes early (7 AM) and leaves on time
+                early_check_in = time(7, 0)
+                total_hours = timedelta(hours=8)  # 8 hours actual work
+                
                 att, created = Attendance.objects.get_or_create(
                     employee=emp_objs[1],
                     date=d,
-                    check_in=time(7,0),
-                    check_out=time(17,0),
-                    break_duration=timedelta(hours=1),
+                    defaults={
+                        'check_in': early_check_in,
+                        'check_out': standard_check_out,
+                        'total_hours': timedelta(hours=8),  # 8 hours actual work
+                        'break_duration': lunch_break_duration,
+                        'status': 'checked_out',
+                        'location': '192.168.1.101',  # Sample office IP
+                        'late_arrival': False,
+                        'early_departure': False,
+                        'overtime_hours': timedelta(hours=0),
+                        'break_start': time(12, 0),
+                        'break_end': time(13, 0),
+                    }
                 )
-                print(f"Employee1 attendance: {d} - created: {created}")
+                if created:
+                    self.stdout.write(f"  Created employee1 attendance for {d}")
             else:
-                print(f"Employee1 absent: {d}")
-        # employee2: chỉ tạo attendance từ 25/9/2025 đến hôm nay, đi trễ 3 ngày đầu
+                self.stdout.write(f"  Employee1 absent on {d}")
+        
+        # Employee2 attendance: only from hire date (Sep 25), late first 3 days
+        self.stdout.write('Creating employee2 attendance records...')
         emp2_start = date(2025, 9, 25)
-        emp2_days = [d for d in work_days if d >= emp2_start]
+        emp2_days = [d for d in work_days if d >= emp2_start and d.weekday() < 5]
+        
         for idx, d in enumerate(emp2_days):
+            is_late = idx < 3  # Late for first 3 days
+            check_in_time = time(8, 30) if is_late else standard_check_in
+            
+            # Calculate hours based on actual check-in time
+            if is_late:
+                # Late by 30 minutes, so 7.5 hours work day
+                total_hours = timedelta(hours=7, minutes=30)
+                overtime_hours = timedelta(hours=0)
+            else:
+                total_hours = timedelta(hours=8)
+                overtime_hours = timedelta(hours=0)
+            
+            # Some days with overtime for variety
+            if d.day % 7 == 0:  # Every 7th day, work overtime
+                check_out_time = time(19, 0)  # 7 PM
+                total_hours = timedelta(hours=9) if not is_late else timedelta(hours=8, minutes=30)
+                overtime_hours = timedelta(hours=1) if not is_late else timedelta(minutes=30)
+            else:
+                check_out_time = standard_check_out
+            
             att, created = Attendance.objects.get_or_create(
                 employee=emp_objs[2],
                 date=d,
-                check_in=time(8,30) if idx < 3 else time(8,0),
-                check_out=time(17,0),
-                break_duration=timedelta(hours=1),
+                defaults={
+                    'check_in': check_in_time,
+                    'check_out': check_out_time,
+                    'total_hours': total_hours,
+                    'break_duration': lunch_break_duration,
+                    'status': 'checked_out',
+                    'location': '192.168.1.102',  # Sample office IP
+                    'late_arrival': is_late,
+                    'early_departure': False,
+                    'overtime_hours': overtime_hours,
+                    'break_start': time(12, 0),
+                    'break_end': time(13, 0),
+                }
             )
-            print(f"Employee2 attendance: {d} - created: {created}")
+            if created:
+                status_text = " (LATE)" if is_late else ""
+                overtime_text = f" (OT: {overtime_hours})" if overtime_hours > timedelta(0) else ""
+                self.stdout.write(f"  Created employee2 attendance for {d}{status_text}{overtime_text}")
+        
+        # Create some "incomplete" attendance records for today to show different statuses
+        today = date.today()
+        if today <= end_date:
+            self.stdout.write('Creating incomplete attendance records for today...')
+            
+            # Manager checked in but not out yet
+            incomplete_att, created = Attendance.objects.get_or_create(
+                employee=emp_objs[0],
+                date=today,
+                defaults={
+                    'check_in': time(8, 15),  # Slightly late
+                    'check_out': None,
+                    'total_hours': None,
+                    'break_duration': timedelta(hours=0),
+                    'status': 'checked_in',
+                    'location': '192.168.1.100',
+                    'late_arrival': True,  # 15 minutes late
+                    'early_departure': False,
+                    'overtime_hours': timedelta(hours=0),
+                    'break_start': None,
+                    'break_end': None,
+                }
+            )
+            if created:
+                self.stdout.write("  Created manager's incomplete attendance for today")
+            
+            # Employee1 on break
+            break_att, created = Attendance.objects.get_or_create(
+                employee=emp_objs[1],
+                date=today,
+                defaults={
+                    'check_in': time(7, 30),
+                    'check_out': None,
+                    'total_hours': None,
+                    'break_duration': timedelta(hours=0),
+                    'status': 'on_break',
+                    'location': '192.168.1.101',
+                    'late_arrival': False,
+                    'early_departure': False,
+                    'overtime_hours': timedelta(hours=0),
+                    'break_start': time(12, 0),
+                    'break_end': None,
+                }
+            )
+            if created:
+                self.stdout.write("  Created employee1's break attendance for today")
+            
+            # Employee2 not started yet
+            not_started_att, created = Attendance.objects.get_or_create(
+                employee=emp_objs[2],
+                date=today,
+                defaults={
+                    'check_in': None,
+                    'check_out': None,
+                    'total_hours': None,
+                    'break_duration': timedelta(hours=0),
+                    'status': 'not_started',
+                    'location': None,
+                    'late_arrival': False,
+                    'early_departure': False,
+                    'overtime_hours': timedelta(hours=0),
+                    'break_start': None,
+                    'break_end': None,
+                }
+            )
+            if created:
+                self.stdout.write("  Created employee2's not started attendance for today")
 
         # Create sample performance review
         if len(emp_objs) > 1:
