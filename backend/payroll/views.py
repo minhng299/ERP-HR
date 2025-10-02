@@ -47,14 +47,15 @@ class MySalaryView(APIView):
             return Response({'error': 'Employee not found'}, status=404)
 
         today = date.today()
-        # Lấy tháng trước (nếu muốn lương tháng vừa rồi)
-        today = (today.replace(day=1) - timedelta(days=1)).replace(day=1)
+        # Calculate for current month instead of previous month
+        month = today.replace(day=1)
 
         from payroll.services import PayrollService
         penalty_per_day = 100000
         base_salary = employee.salary
-        bonus = 0
-        month = today.replace(day=1)
+        overtime_bonus = PayrollService.calculate_overtime_bonus(employee, month)
+        bonus = overtime_bonus
+        # Use the month we calculated above instead of recalculating
 
         # --- Gọi service để tạo/ cập nhật SalaryRecord ---
         record = SalaryRecord.objects.filter(
@@ -89,4 +90,14 @@ class MySalaryView(APIView):
             'bonus': record.bonus,
             'deductions': int(record.deductions),
             'month': record.month,
+            'total_hours_worked': float(record.total_hours_worked),
+            'overtime_hours': float(record.overtime_hours),
+            'late_days': record.late_days,
+            'absent_days': record.absent_days,
+            'incomplete_days': record.incomplete_days,
+            'debug_info': {
+                'calculation_month': str(month),
+                'employee_base_salary_in_db': float(employee.salary),
+                'is_current_month': month.month == date.today().month
+            }
         })
