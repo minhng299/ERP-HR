@@ -6,7 +6,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('hrms', '0006_alter_leaverequest_status_alter_performance_status'),
+        ('hrms', '0006_merge_20251001_1034'),
         ('hrms', '0007_alter_leaverequest_status_alter_performance_status'),
     ]
 

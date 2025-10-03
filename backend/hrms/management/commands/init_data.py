@@ -284,10 +284,14 @@ class Command(BaseCommand):
                 self.stdout.write("  Created employee2's not started attendance for today")
 
         # Create sample performance review
-        if len(emp_objs) > 1:
+        emp = emp_objs[1]  # employee
+# Tìm reviewer cùng department và role='Manager'
+        reviewer = Employee.objects.filter(department=emp.department, role__iexact='Manager').first()
+
+        if reviewer:
             Performance.objects.get_or_create(
-                employee=emp_objs[1],
-                reviewer=emp_objs[0],
+                employee=emp,
+                reviewer=reviewer,
                 review_period_start=date(2023, 1, 1),
                 review_period_end=date(2023, 12, 31),
                 overall_rating=5,
