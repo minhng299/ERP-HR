@@ -6,6 +6,7 @@ from django.utils.text import slugify
 from django.db.models.signals import pre_save, post_delete
 from django.dispatch import receiver
 from datetime import time, timedelta
+from datetime import timedelta
 
 
 class Department(models.Model):
@@ -76,6 +77,7 @@ class Attendance(models.Model):
     check_in = models.TimeField(null=True, blank=True)
     check_out = models.TimeField(null=True, blank=True)
     break_duration = models.DurationField(default=timedelta(hours=0))
+    break_duration = models.DurationField(default=timedelta())  
     total_hours = models.DurationField(null=True, blank=True)
     notes = models.TextField(blank=True)
     

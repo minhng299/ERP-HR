@@ -170,11 +170,15 @@ const LeaveManagement = () => {
           </div>
           <div className="bg-white rounded-lg shadow p-4">
             <div className="text-2xl font-bold text-green-600">{stats.approved_this_month}</div>
-            <div className="text-sm text-gray-500">Approved This Month</div>
+            <div className="text-sm text-gray-500">
+              {filterMonth ? `Approved in ${filterMonth}` : 'Total Approved'}
+            </div>
           </div>
           <div className="bg-white rounded-lg shadow p-4">
             <div className="text-2xl font-bold text-red-600">{stats.rejected_this_month}</div>
-            <div className="text-sm text-gray-500">Rejected This Month</div>
+            <div className="text-sm text-gray-500">
+              {filterMonth ? `Rejected in ${filterMonth}` : 'Total Rejected'}
+            </div>  
           </div>
         </div>
       )}
