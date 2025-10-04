@@ -75,7 +75,7 @@ const CreateLeaveRequest = ({ onSuccess }) => {
 
       <textarea name="reason" value={formData.reason} onChange={handleChange} placeholder="Lý do nghỉ" className="input" />
 
-      <button type="submit" className="btn bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded">
+      <button type="submit" className="bg-blue-500 text-white hover:bg-blue-600 px-4 py-2 rounded">
         Gửi đơn nghỉ
       </button>
     </form>

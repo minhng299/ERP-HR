@@ -413,6 +413,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'current_time': timezone.now().time().strftime('%I:%M %p')
         })
     
+# >>>>>>> upstream/main
     @action(detail=False, methods=['get'])
     def today(self, request):
         """Get today's attendance for all employees (managers only)"""

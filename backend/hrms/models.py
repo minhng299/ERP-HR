@@ -75,7 +75,13 @@ class Attendance(models.Model):
     date = models.DateField()
     check_in = models.TimeField(null=True, blank=True)
     check_out = models.TimeField(null=True, blank=True)
+
+    # SỬA: Thay DurationField bằng CharField
+    # break_duration = models.CharField(max_length=20, default='00:00:00')
+    
+
     break_duration = models.DurationField(default=timedelta(hours=0))
+
     total_hours = models.DurationField(null=True, blank=True)
     notes = models.TextField(blank=True)
     
@@ -106,6 +112,9 @@ class Attendance(models.Model):
         ordering = ['-date', '-created_at']
     
     def save(self, *args, **kwargs):
+
+        # KHÔNG tính toán gì cả, chỉ lưu đơn giản
+
         # Auto-calculate total hours if both check_in and check_out exist
         if self.check_in and self.check_out:
             from datetime import datetime, timedelta
@@ -130,6 +139,7 @@ class Attendance(models.Model):
         if self.check_in and self.check_in > self.expected_start:
             self.late_arrival = True
             
+
         super().save(*args, **kwargs)
     
     def is_late(self):
