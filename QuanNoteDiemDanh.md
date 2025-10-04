@@ -432,3 +432,219 @@ Authorization: Bearer <token>
 2. GET /api/attendance/department_attendance/?date=2025-10-01  # Xem phòng ban
 3. GET /api/attendance/stats/           # Xem thống kê
 ```
+---------------v3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 📋 **PHÂN TÍCH CÁC API TRONG ATTENDANCEVIEWSET HIỆN TẠI**
+
+## 🎯 **TỔNG QUAN 7 API ENDPOINTS**
+
+### **1. ⏰ CHECK-IN API**
+```http
+POST /api/attendance/check_in/
+```
+**Chức năng:** Chấm công vào làm
+**Chi tiết:**
+- Ghi nhận thời điểm nhân viên bắt đầu làm việc
+- Tự động phát hiện đi muộn (sau 9:00 AM)
+- Kiểm tra nhân viên có đang nghỉ phép không
+- Ghi nhận IP address để tracking
+- Tạo trạng thái `checked_in`
+
+**Flow:**
+```
+Nhân viên đến công ty → Check-in → Hệ thống ghi nhận thời gian → Kiểm tra muộn → Cập nhật trạng thái
+```
+
+---
+
+### **2. 🏃 CHECK-OUT API**
+```http
+POST /api/attendance/check_out/
+```
+**Chức năng:** Chấm công tan ca
+**Chi tiết:**
+- Ghi nhận thời điểm kết thúc làm việc
+- Tự động tính tổng giờ làm: `(check_out - check_in) - break_time`
+- Tính overtime (làm thêm giờ)
+- Phát hiện về sớm (trước 5:00 PM)
+- Tự động kết thúc break nếu đang nghỉ
+- Cập nhật trạng thái `checked_out`
+
+**Tính toán:**
+```
+Ví dụ: 
+Check-in: 09:00, Check-out: 18:00, Break: 1h
+→ Total: 8 hours, Overtime: 1 hour
+```
+
+---
+
+### **3. ☕ START BREAK API**
+```http
+POST /api/attendance/start_break/
+```
+**Chức năng:** Bắt đầu giờ nghỉ giải lao
+**Chi tiết:**
+- Đánh dấu thời điểm bắt đầu nghỉ
+- Chuyển trạng thái sang `on_break`
+- Nhân viên không thể check-out khi đang break
+- Dùng cho nghỉ trưa, nghỉ giữa giờ
+
+**Use case:**
+```
+Nhân viên nghỉ trưa → Start break → Hệ thống ghi nhận → Nhân viên có thể end break sau
+```
+
+---
+
+### **4. ⏱️ END BREAK API**
+```http
+POST /api/attendance/end_break/
+```
+**Chức năng:** Kết thúc giờ nghỉ giải lao
+**Chi tiết:**
+- Đánh dấu thời điểm kết thúc nghỉ
+- Tự động tính thời gian break duration
+- Cộng dồn vào tổng thời gian nghỉ trong ngày
+- Chuyển trạng thái về `checked_in`
+
+**Tính toán:**
+```
+Start break: 12:00, End break: 13:00 → Break duration: 1 hour
+```
+
+---
+
+### **5. 📱 CURRENT STATUS API**
+```http
+GET /api/attendance/current_status/
+```
+**Chức năng:** Xem trạng thái chấm công hiện tại
+**Chi tiết:**
+- Hiển thị trạng thái hiện tại của nhân viên
+- Cho biết các action có thể thực hiện
+- Kiểm tra nếu nhân viên đang nghỉ phép
+- Hiển thị thông tin attendance hiện tại
+
+**Response ví dụ:**
+```json
+{
+    "can_check_in": false,      // Đã check-in rồi
+    "can_check_out": true,      // Có thể check-out
+    "can_start_break": true,    // Có thể nghỉ
+    "can_end_break": false,     // Không đang nghỉ
+    "current_time": "14:30",
+    "attendance": { ... }
+}
+```
+
+---
+
+### **6. 📊 TODAY'S ATTENDANCE API**
+```http
+GET /api/attendance/today/
+```
+**Chức năng:** Xem chấm công cả công ty hôm nay (Manager only)
+**Chi tiết:**
+- Chỉ dành cho Manager
+- Hiển thị tất cả nhân viên đã chấm công hôm nay
+- Theo dõi real-time ai đang làm việc, ai nghỉ
+- Dùng để quản lý tổng quan phòng ban
+
+**Use case:**
+```
+Manager muốn biết: 
+- Hôm nay có bao nhiêu nhân viên đi làm?
+- Ai chưa check-in? 
+- Ai đang làm việc, ai đã về?
+```
+
+---
+
+### **7. 📈 STATISTICS API**
+```http
+GET /api/attendance/stats/
+```
+**Chức năng:** Thống kê chấm công
+**Chi tiết:**
+- **Manager:** Thống kê toàn công ty
+- **Employee:** Thống kê cá nhân
+- Số người đi làm hôm nay
+- Số người đã về
+- Số người đi muộn
+- Số người đang nghỉ giải lao
+- Giờ làm trung bình
+
+**Ví dụ Manager:**
+```json
+{
+    "total_present": 45,    // Tổng đi làm
+    "checked_out": 40,      // Đã về
+    "late_arrivals": 5,     // Đi muộn
+    "on_break": 3,          // Đang nghỉ
+    "average_hours": 8.2    // Giờ làm TB
+}
+```
+
+---
+
+### **8. 🔍 FILTERED LIST API** (Từ ModelViewSet)
+```http
+GET /api/attendance/?date_from=2025-10-01&date_to=2025-10-31&employee=1
+```
+**Chức năng:** Lọc và xem lịch sử chấm công
+**Chi tiết:**
+- **Employee:** Chỉ xem được của bản thân
+- **Manager:** Xem được tất cả nhân viên
+- Filter theo ngày, nhân viên, trạng thái
+- Xem lịch sử nhiều ngày
+
+## 🎯 **WORKFLOW SỬ DỤNG THỰC TẾ**
+
+### **Cho Nhân Viên:**
+```
+1. Đến công ty → Check-in (ghi nhận giờ vào)
+2. Nghỉ trưa → Start break → End break (ghi nhận nghỉ)
+3. Tan ca → Check-out (tính tổng giờ làm + overtime)
+4. Kiểm tra → Current status (xem trạng thái hiện tại)
+```
+
+### **Cho Quản Lý:**
+```
+1. Sáng sớm → Today attendance (xem ai đã đi làm)
+2. Trong ngày → Stats (theo dõi tổng quan)
+3. Cuối ngày → Filtered list (xem báo cáo chi tiết)
+```

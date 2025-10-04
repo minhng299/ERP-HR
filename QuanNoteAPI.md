@@ -797,3 +797,147 @@ Authorization: Bearer <token>
   "status": "finalized"
 }
 ```
+
+
+
+
+<!-- ------------------------- -->
+
+
+Dựa trên code bạn cung cấp, tôi sẽ phân tích chi tiết các chức năng của hệ thống và liệt kê đầy đủ các API endpoints.
+
+## **PHÂN TÍCH HỆ THỐNG**
+
+### **Tổng quan hệ thống**
+Đây là hệ thống **HRMS (Human Resource Management System)** với các module chính:
+- **Quản lý nhân sự** (Employee, Department, Position)
+- **Chấm công** (Attendance) 
+- **Quản lý nghỉ phép** (Leave Management)
+- **Đánh giá hiệu suất** (Performance Review)
+- **Phân quyền** (Role-based Authorization)
+
+### **Kiến trúc phân quyền**
+- **Manager**: Toàn quyền truy cập và quản lý
+- **Employee**: Chỉ xem/chỉnh sửa thông tin cá nhân
+- **Authentication**: JWT Token-based
+
+---
+
+## **DANH SÁCH API ENDPOINTS CHUẨN**
+
+### **1. AUTHENTICATION API**
+
+| Method | URL | Chức năng | Đầu vào | Permission |
+|--------|-----|-----------|---------|------------|
+| POST | `/api/auth/signup/` | Đăng ký tài khoản mới | `username, password, email, first_name, last_name, employee_id, phone_number, address, date_of_birth, hire_date, department, position, salary` | Public |
+| POST | `/api/auth/change-password/` | Đổi mật khẩu | `current_password, new_password` | IsAuthenticated |
+| POST | `/api/token/` | Lấy JWT token | `username, password` | Public |
+| POST | `/api/token/refresh/` | Refresh JWT token | `refresh_token` | Public |
+
+### **2. EMPLOYEE MANAGEMENT API**
+
+| Method | URL | Chức năng | Đầu vào | Permission |
+|--------|-----|-----------|---------|------------|
+| GET | `/api/employees/` | Danh sách nhân viên | Query: `?search=` | IsAuthenticated, IsManagerOrReadOnly |
+| POST | `/api/employees/` | Tạo nhân viên mới | Employee data + User data | IsAuthenticated, IsManagerOrReadOnly |
+| GET | `/api/employees/{id}/` | Chi tiết nhân viên | - | IsAuthenticated, IsManagerOrReadOnly |
+| PUT/PATCH | `/api/employees/{id}/` | Cập nhật nhân viên | Employee data | IsAuthenticated, IsManagerOrReadOnly |
+| DELETE | `/api/employees/{id}/` | Xóa nhân viên | - | IsAuthenticated, IsManagerOrReadOnly |
+| GET/PATCH | `/api/employees/me/` | Xem/cập nhật thông tin cá nhân | `phone_number, address, date_of_birth, first_name, last_name, email` | IsAuthenticated |
+| GET | `/api/employees/dashboard_stats/` | Thống kê dashboard | - | IsAuthenticated |
+
+### **3. DEPARTMENT & POSITION API**
+
+| Method | URL | Chức năng | Đầu vào | Permission |
+|--------|-----|-----------|---------|------------|
+| GET | `/api/departments/` | Danh sách phòng ban | - | IsAuthenticated, IsManagerOrReadOnly |
+| POST | `/api/departments/` | Tạo phòng ban | `name, description` | IsAuthenticated, IsManagerOrReadOnly |
+| GET | `/api/departments/{id}/` | Chi tiết phòng ban | - | IsAuthenticated, IsManagerOrReadOnly |
+| PUT/PATCH | `/api/departments/{id}/` | Cập nhật phòng ban | Department data | IsAuthenticated, IsManagerOrReadOnly |
+| DELETE | `/api/departments/{id}/` | Xóa phòng ban | - | IsAuthenticated, IsManagerOrReadOnly |
+| GET | `/api/positions/` | Danh sách chức vụ | - | IsAuthenticated, IsManagerOrReadOnly |
+| POST | `/api/positions/` | Tạo chức vụ | `title, department, description, salary_min, salary_max` | IsAuthenticated, IsManagerOrReadOnly |
+
+### **4. ATTENDANCE API (CHẤM CÔNG)**
+
+| Method | URL | Chức năng | Đầu vào | Permission |
+|--------|-----|-----------|---------|------------|
+| GET | `/api/attendance/` | Lịch sử chấm công | Query: `?employee= &date= &status= &date_from= &date_to=` | IsAuthenticated |
+| POST | `/api/attendance/` | Tạo bản ghi chấm công | Attendance data | IsAuthenticated |
+| GET | `/api/attendance/{id}/` | Chi tiết chấm công | - | IsAuthenticated |
+| PUT/PATCH | `/api/attendance/{id}/` | Cập nhật chấm công | Attendance data | IsAuthenticated |
+| DELETE | `/api/attendance/{id}/` | Xóa chấm công | - | IsAuthenticated |
+| **POST** | `/api/attendance/check_in/` | **Check-in** | `notes` (optional) | IsAuthenticated |
+| **POST** | `/api/attendance/check_out/` | **Check-out** | `notes` (optional) | IsAuthenticated |
+| **POST** | `/api/attendance/start_break/` | **Bắt đầu nghỉ** | - | IsAuthenticated |
+| **POST** | `/api/attendance/end_break/` | **Kết thúc nghỉ** | - | IsAuthenticated |
+| **GET** | `/api/attendance/current_status/` | **Trạng thái hiện tại** | - | IsAuthenticated |
+| **GET** | `/api/attendance/today/` | **Chấm công hôm nay** (all employees) | - | Manager only |
+| **GET** | `/api/attendance/stats/` | **Thống kê chấm công** | - | IsAuthenticated |
+
+### **5. LEAVE MANAGEMENT API**
+
+| Method | URL | Chức năng | Đầu vào | Permission |
+|--------|-----|-----------|---------|------------|
+| GET | `/api/leave-requests/` | Danh sách đơn nghỉ | Query: `?status= &employee= ` | IsAuthenticated |
+| POST | `/api/leave-requests/` | Tạo đơn xin nghỉ | `leave_type, start_date, end_date, reason` | IsAuthenticated, IsEmployee |
+| GET | `/api/leave-requests/{id}/` | Chi tiết đơn nghỉ | - | IsAuthenticated |
+| PUT/PATCH | `/api/leave-requests/{id}/` | Cập nhật đơn nghỉ | Leave data | IsAuthenticated |
+| DELETE | `/api/leave-requests/{id}/` | Xóa đơn nghỉ | - | IsAuthenticated |
+| **POST** | `/api/leave-requests/{id}/approve/` | **Duyệt đơn** | - | IsAuthenticated, IsManagerOrReadOnly |
+| **POST** | `/api/leave-requests/{id}/reject/` | **Từ chối đơn** | - | IsAuthenticated, IsManagerOrReadOnly |
+| **POST** | `/api/leave-requests/{id}/cancel/` | **Hủy đơn** | - | IsAuthenticated, IsEmployee |
+| **GET** | `/api/leave-requests/stats/` | **Thống kê đơn nghỉ** | - | IsAuthenticated |
+| GET | `/api/leave-types/` | Danh sách loại nghỉ | - | IsAuthenticated, IsManagerOrReadOnly |
+| POST | `/api/leave-types/` | Tạo loại nghỉ | `name, code, description, max_days_per_year, is_paid` | IsAuthenticated, IsManagerOrReadOnly |
+
+### **6. PERFORMANCE REVIEW API**
+
+| Method | URL | Chức năng | Đầu vào | Permission |
+|--------|-----|-----------|---------|------------|
+| GET | `/api/performances/` | Danh sách đánh giá | Query: `?employee= &reviewer= &status= ` | IsAuthenticated |
+| POST | `/api/performances/` | Tạo đánh giá | Performance data | IsAuthenticated, IsManagerOrReadOnly |
+| GET | `/api/performances/{id}/` | Chi tiết đánh giá | - | IsAuthenticated |
+| PUT/PATCH | `/api/performances/{id}/` | Cập nhật đánh giá | Performance data | IsAuthenticated |
+| DELETE | `/api/performances/{id}/` | Xóa đánh giá | - | IsAuthenticated, IsManagerOrReadOnly |
+| **GET** | `/api/performances/my_reviews/` | **Đánh giá của tôi** | - | IsAuthenticated |
+| **GET** | `/api/performances/by_status/` | **Lọc theo trạng thái** | Query: `?status= ` | IsAuthenticated |
+| **GET** | `/api/performances/analytics/` | **Thống kê đánh giá** | - | IsAuthenticated |
+| **GET** | `/api/performances/{id}/review_history/` | **Lịch sử đánh giá** | - | IsAuthenticated |
+| **GET** | `/api/performances/{id}/export_pdf/` | **Xuất PDF** | - | IsAuthenticated |
+
+---
+
+## **ĐẶC ĐIỂM NỔI BẬT CỦA HỆ THỐNG**
+
+### **1. Real-time Attendance Features**
+- Check-in/check-out thời gian thực
+- Quản lý giờ nghỉ (break)
+- Tự động tính toán giờ làm, overtime
+- Kiểm tra trạng thái hiện tại
+
+### **2. Leave Management Integration**
+- Tích hợp tự động với chấm công
+- Tự động cập nhật trạng thái "on_leave"
+- Quản lý số ngày nghỉ còn lại
+- Workflow: Pending → Approved/Rejected/Cancelled
+
+### **3. Performance Review Workflow**
+- Multi-status: Draft → Submitted → Feedback → Finalized
+- Employee có thể phản hồi đánh giá
+- Export PDF capability
+- Analytics và thống kê
+
+### **4. Security & Permissions**
+- JWT Authentication
+- Role-based access control
+- Manager vs Employee permissions
+- Self-service profile updates
+
+### **5. Data Filtering & Analytics**
+- Filter theo multiple criteria
+- Dashboard statistics
+- Date range filtering
+- Department-based data access
+
+Hệ thống này cung cấp một giải pháp HRMS toàn diện với đầy đủ các tính năng cần thiết cho quản lý nhân sự trong doanh nghiệp.
