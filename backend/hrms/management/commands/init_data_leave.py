@@ -8,9 +8,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         # Xóa dữ liệu cũ để tránh lỗi trùng lặp
-        LeaveRequest.objects.all().delete()
-        LeavePenalty.objects.all().delete()
-        LeaveType.objects.all().delete()
+        # LeaveRequest.objects.all().delete()
+        # LeavePenalty.objects.all().delete()
+        # LeaveType.objects.all().delete()
         # 1. Tạo các loại nghỉ phép
         leave_types = [
             {
