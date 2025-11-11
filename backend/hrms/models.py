@@ -296,8 +296,17 @@ class LeaveRequest(models.Model):
     def clean(self):
         if self.start_date > self.end_date:
             raise ValidationError("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.")
+
+        # Tính số ngày nghỉ không bao gồm Thứ Bảy và Chủ Nhật
         if not self.days_requested:
-            self.days_requested = (self.end_date - self.start_date).days + 1
+            current_day = self.start_date
+            total_days = 0
+            while current_day <= self.end_date:
+                if current_day.weekday() < 5:  # 0 = Thứ Hai, ..., 4 = Thứ Sáu
+                    total_days += 1
+                current_day += timedelta(days=1)
+            self.days_requested = total_days
+
         if self.status == 'approved' and self.days_requested > self.employee.annual_leave_remaining:
             raise ValidationError("Không đủ số ngày nghỉ còn lại.")
 

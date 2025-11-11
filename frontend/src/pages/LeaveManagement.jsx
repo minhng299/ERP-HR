@@ -247,26 +247,25 @@ const LeaveManagement = () => {
       </div>
 
             {showDetail && selectedRequest && (
-      <div className="absolute top-24 left-1/2 transform -translate-x-1/2 bg-white shadow-xl rounded-lg p-6 w-full max-w-xl z-50 border border-gray-200">
-        <h2 className="text-xl font-bold mb-4">Leave Details</h2>
-        <p><strong>Employee:</strong> {selectedRequest.employee_name}</p>
-        <p><strong>Type:</strong> {selectedRequest.leave_type_name}</p>
-        <p><strong>Duration:</strong> {new Date(selectedRequest.start_date).toLocaleDateString()} - {new Date(selectedRequest.end_date).toLocaleDateString()}</p>
-        <p><strong>Days:</strong> {selectedRequest.days_requested}</p>
-        <p><strong>Status:</strong> {selectedRequest.status}</p>
-        <p><strong>Reason:</strong> {selectedRequest.reason}</p>
+              <div className="absolute top-24 left-1/2 transform -translate-x-1/2 bg-white shadow-xl rounded-lg p-6 w-full max-w-xl z-50 border border-gray-200">
+                <h2 className="text-xl font-bold mb-4">Leave Details</h2>
+                <p><strong>Employee:</strong> {selectedRequest.employee_name}</p>
+                <p><strong>Type:</strong> {selectedRequest.leave_type_name}</p>
+                <p><strong>Duration:</strong> {new Date(selectedRequest.start_date).toLocaleDateString()} - {new Date(selectedRequest.end_date).toLocaleDateString()}</p>
+                <p><strong>Days:</strong> {selectedRequest.days_requested}</p>
+                <p><strong>Status:</strong> {selectedRequest.status}</p>
+                <p><strong>Reason:</strong> {selectedRequest.reason}</p>
 
-        <button onClick={() => setShowDetail(false)}
-        className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl"
-      >
-        ✖
-      </button>
-
-      </div>
-    )}
+                  <button onClick={() => setShowDetail(false)}
+                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 text-xl"
+                >
+                  ✖
+                </button>
+              </div>
+            )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+        <div className="fixed inset-0 flex justify-center items-center z-50">
           <div className="bg-white p-6 rounded-lg w-full max-w-xl">
             <CreateLeaveRequest
               onSuccess={() => {
