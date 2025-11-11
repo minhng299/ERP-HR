@@ -22,6 +22,12 @@ const Dashboard = () => {
     fetchStats();
   }, []);
 
+  useEffect(() => {
+    if (stats) {
+      console.log('Fetched dashboard stats', stats);
+    }
+  }, [stats]);
+
   if (loading) return <div className="p-6">Loading...</div>;
   if (authError) return <div className="p-6 text-red-500">Authentication failed. Please log in.</div>;
   if (!stats) return <div className="p-6">No data available</div>;

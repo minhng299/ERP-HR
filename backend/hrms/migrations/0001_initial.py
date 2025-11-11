@@ -29,6 +29,10 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=50)),
+<<<<<<< HEAD
+=======
+                ('days_allowed', models.IntegerField()),
+>>>>>>> 3622ccc (push base)
                 ('description', models.TextField(blank=True)),
             ],
         ),
