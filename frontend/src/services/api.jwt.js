@@ -207,6 +207,10 @@ export const hrapi = {
     const query = month ? `?month=${month}` : '';
     return api.get(`/payroll/my-salary/${query}`);
   },
+  getPayslipPdf: (month) => {
+    const query = month ? `?month=${month}` : '';
+    return api.get(`/payroll/payslip/${query}`, { responseType: 'blob' });
+  },
   setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
   getPerformances: () => api.get('/performances/'),                     
   getPerformance: (id) => api.get(`/performances/${id}/`),              
