@@ -119,34 +119,105 @@ const Salary = () => {
                 <div><span className="font-semibold">Employee ID:</span> {salary.payslip?.employee_id}</div>
               </div>
 
+              {/* Leave Information Section */}
+              {(salary.payslip?.approved_leave_days > 0 || salary.payslip?.rejected_leave_days > 0) && (
+                <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
+                  <div className="font-semibold mb-2 text-blue-800">Leave Information</div>
+                  <div className="text-sm space-y-1">
+                    {salary.payslip?.approved_leave_days > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-green-700">Approved Leave Days:</span>
+                        <span className="font-semibold text-green-700">{salary.payslip.approved_leave_days} days</span>
+                      </div>
+                    )}
+                    {salary.payslip?.rejected_leave_days > 0 && (
+                      <div className="flex justify-between">
+                        <span className="text-red-700">Rejected Leave Days:</span>
+                        <span className="font-semibold text-red-700">{salary.payslip.rejected_leave_days} days</span>
+                      </div>
+                    )}
+                    {salary.payslip?.total_leave_days > salary.payslip?.leave_penalty_threshold && (
+                      <div className="mt-2 pt-2 border-t border-blue-300 text-xs text-gray-600">
+                        <div>Total approved: {salary.payslip.total_leave_days} days</div>
+                        <div>Free days: {salary.payslip.leave_penalty_threshold} days</div>
+                        <div className="font-semibold text-red-600">
+                          Penalty applied for: {salary.payslip.total_leave_days - salary.payslip.leave_penalty_threshold} days
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                 <div>
                   <div className="font-semibold mb-2">Earnings</div>
-                  <div className="flex justify-between"><span>Base Salary</span><span>{salary.payslip?.base_salary} VND</span></div>
-                  <div className="flex justify-between"><span>Overtime Bonus</span><span>{salary.payslip?.overtime_bonus} VND</span></div>
-                  <div className="flex justify-between"><span>Other Bonus</span><span>{salary.payslip?.other_bonus} VND</span></div>
+                  <div className="flex justify-between"><span>Base Salary</span><span>{salary.payslip?.base_salary?.toLocaleString()} VND</span></div>
+                  <div className="flex justify-between"><span>Overtime Bonus</span><span>{salary.payslip?.overtime_bonus?.toLocaleString()} VND</span></div>
+                  <div className="flex justify-between"><span>Other Bonus</span><span>{salary.payslip?.other_bonus?.toLocaleString()} VND</span></div>
                   <div className="flex justify-between font-semibold border-t mt-2 pt-2">
                     <span>Gross Salary</span>
-                    <span>{salary.payslip?.gross_salary} VND</span>
+                    <span>{salary.payslip?.gross_salary?.toLocaleString()} VND</span>
                   </div>
                 </div>
 
                 <div>
                   <div className="font-semibold mb-2">Deductions</div>
-                  <div className="flex justify-between"><span>Late ({salary.payslip?.late_days} days)</span><span>{salary.payslip?.late_penalty} VND</span></div>
-                  <div className="flex justify-between"><span>Absent ({salary.payslip?.absent_days} days)</span><span>{salary.payslip?.absent_penalty} VND</span></div>
-                  <div className="flex justify-between"><span>Incomplete ({salary.payslip?.incomplete_days} days)</span><span>{salary.payslip?.incomplete_penalty} VND</span></div>
-                  <div className="flex justify-between"><span>Leave Penalty</span><span>{salary.payslip?.leave_penalty} VND</span></div>
+                  
+                  {/* Late Penalty */}
+                  {salary.payslip?.late_days > 0 && (
+                    <div className="flex justify-between text-gray-700">
+                      <span>Late Arrival ({salary.payslip?.late_days} days × 100,000)</span>
+                      <span className="text-red-600">-{salary.payslip?.late_penalty?.toLocaleString()} VND</span>
+                    </div>
+                  )}
+                  
+                  {/* Absent Penalty */}
+                  {salary.payslip?.absent_days > 0 && (
+                    <div className="flex justify-between text-gray-700">
+                      <span>Absent ({salary.payslip?.absent_days} days × 100,000)</span>
+                      <span className="text-red-600">-{salary.payslip?.absent_penalty?.toLocaleString()} VND</span>
+                    </div>
+                  )}
+                  
+                  {/* Incomplete Penalty */}
+                  {salary.payslip?.incomplete_days > 0 && (
+                    <div className="flex justify-between text-gray-700">
+                      <span>Incomplete Attendance ({salary.payslip?.incomplete_days} days × 50,000)</span>
+                      <span className="text-red-600">-{salary.payslip?.incomplete_penalty?.toLocaleString()} VND</span>
+                    </div>
+                  )}
+                  
+                  {/* Leave Penalty - detailed breakdown */}
+                  {salary.payslip?.leave_penalty > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-200">
+                      <div className="flex justify-between text-gray-700 mb-1">
+                        <span className="font-semibold">Leave Penalty (over {salary.payslip?.leave_penalty_threshold} days)</span>
+                        <span className="text-red-600 font-semibold">-{salary.payslip?.leave_penalty?.toLocaleString()} VND</span>
+                      </div>
+                      {salary.payslip?.leave_penalty_breakdown && salary.payslip.leave_penalty_breakdown.length > 0 && (
+                        <div className="ml-4 text-xs text-gray-600 space-y-1">
+                          {salary.payslip.leave_penalty_breakdown.map((item, idx) => (
+                            <div key={idx} className="flex justify-between">
+                              <span>{item.leave_type} ({item.days} days, {item.penalty_percent}%)</span>
+                              <span>-{item.penalty_amount?.toLocaleString()} VND</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex justify-between font-semibold border-t mt-2 pt-2">
                     <span>Total Deductions</span>
-                    <span>{salary.payslip?.total_deductions} VND</span>
+                    <span className="text-red-600">{salary.payslip?.total_deductions?.toLocaleString()} VND</span>
                   </div>
                 </div>
               </div>
 
               <div className="border-t pt-3 mt-2 flex justify-between items-center">
                 <div className="font-semibold text-lg">
-                  Net Salary: <span className="text-green-600">{salary.payslip?.net_salary} VND</span>
+                  Net Salary: <span className="text-green-600">{salary.payslip?.net_salary?.toLocaleString()} VND</span>
                 </div>
                 <button
                   onClick={handleDownloadPdf}

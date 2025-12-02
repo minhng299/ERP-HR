@@ -99,6 +99,58 @@ class MySalaryView(APIView):
         basic_deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
         leave_penalty = float(record.deductions) - basic_deductions
 
+        # Get leave requests details for the month
+        from hrms.models import LeaveRequest
+        start_month = month.replace(day=1)
+        if month.month == 12:
+            next_month = date(month.year + 1, 1, 1)
+        else:
+            next_month = date(month.year, month.month + 1, 1)
+
+        # Query approved and rejected leaves in this month
+        approved_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__gte=start_month,
+            start_date__lt=next_month
+        )
+        rejected_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='rejected',
+            start_date__gte=start_month,
+            start_date__lt=next_month
+        )
+
+        # Calculate total approved/rejected days
+        approved_days = sum([lr.days_requested or 0 for lr in approved_leaves])
+        rejected_days = sum([lr.days_requested or 0 for lr in rejected_leaves])
+
+        # Calculate leave penalty breakdown (when > 4 days)
+        total_leave_days = approved_days
+        leave_penalty_breakdown = []
+        leave_penalty_amount = 0
+        if total_leave_days > 4:
+            penalty_days = total_leave_days - 4
+            from hrms.models import LeavePenalty
+            for lr in approved_leaves:
+                if penalty_days <= 0:
+                    break
+                days = lr.days_requested or 0
+                if days > 0:
+                    leave_penalty_obj = LeavePenalty.objects.filter(leave_type=lr.leave_type).first()
+                    percent = float(leave_penalty_obj.penalty_percent) if leave_penalty_obj else 0
+                    apply_days = min(days, penalty_days)
+                    daily_salary = float(base_salary) / 28
+                    penalty_amount = daily_salary * (percent / 100) * apply_days
+                    leave_penalty_amount += penalty_amount
+                    leave_penalty_breakdown.append({
+                        "leave_type": lr.leave_type.name,
+                        "days": apply_days,
+                        "penalty_percent": percent,
+                        "penalty_amount": int(penalty_amount)
+                    })
+                    penalty_days -= apply_days
+
         payslip = {
             "employee_name": employee.user.get_full_name(),
             "employee_id": employee.id,
@@ -114,7 +166,12 @@ class MySalaryView(APIView):
             "late_penalty": late_days * penalty_per_day,
             "absent_penalty": absent_days * penalty_per_day,
             "incomplete_penalty": int(incomplete_days * penalty_per_day * 0.5),
-            "leave_penalty": int(leave_penalty) if leave_penalty > 0 else 0,
+            "leave_penalty": int(leave_penalty_amount) if leave_penalty_amount > 0 else 0,
+            "leave_penalty_breakdown": leave_penalty_breakdown,
+            "approved_leave_days": approved_days,
+            "rejected_leave_days": rejected_days,
+            "total_leave_days": total_leave_days,
+            "leave_penalty_threshold": 4,
             "total_deductions": int(record.deductions),
             "net_salary": float(record.total_salary),
         }
@@ -192,7 +249,57 @@ class PayslipPDFView(APIView):
 
         late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
         basic_deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
-        leave_penalty = float(record.deductions) - basic_deductions
+        
+        # Get leave requests details for PDF
+        from hrms.models import LeaveRequest, LeavePenalty
+        start_month = month.replace(day=1)
+        if month.month == 12:
+            next_month = date(month.year + 1, 1, 1)
+        else:
+            next_month = date(month.year, month.month + 1, 1)
+
+        approved_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__gte=start_month,
+            start_date__lt=next_month
+        )
+        rejected_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='rejected',
+            start_date__gte=start_month,
+            start_date__lt=next_month
+        )
+
+        approved_days = sum([lr.days_requested or 0 for lr in approved_leaves])
+        rejected_days = sum([lr.days_requested or 0 for lr in rejected_leaves])
+        total_leave_days = approved_days
+        
+        # Calculate leave penalty breakdown
+        leave_penalty_amount = 0
+        leave_penalty_breakdown = []
+        if total_leave_days > 4:
+            penalty_days = total_leave_days - 4
+            for lr in approved_leaves:
+                if penalty_days <= 0:
+                    break
+                days = lr.days_requested or 0
+                if days > 0:
+                    leave_penalty_obj = LeavePenalty.objects.filter(leave_type=lr.leave_type).first()
+                    percent = float(leave_penalty_obj.penalty_percent) if leave_penalty_obj else 0
+                    apply_days = min(days, penalty_days)
+                    daily_salary = float(base_salary) / 28
+                    penalty_amount = daily_salary * (percent / 100) * apply_days
+                    leave_penalty_amount += penalty_amount
+                    leave_penalty_breakdown.append({
+                        "leave_type": lr.leave_type.name,
+                        "days": apply_days,
+                        "penalty_percent": percent,
+                        "penalty_amount": int(penalty_amount)
+                    })
+                    penalty_days -= apply_days
+        
+        leave_penalty = int(leave_penalty_amount) if leave_penalty_amount > 0 else 0
 
         # Create PDF response
         response = HttpResponse(content_type='application/pdf')
@@ -212,6 +319,23 @@ class PayslipPDFView(APIView):
         p.drawString(50, y, f"Month: {month.strftime('%Y-%m')}")
         y -= 30
 
+        # Leave Information Section
+        if approved_days > 0 or rejected_days > 0:
+            p.setFont("Helvetica-Bold", 12)
+            p.drawString(50, y, "Leave Information")
+            y -= 20
+            p.setFont("Helvetica", 10)
+            if approved_days > 0:
+                p.drawString(70, y, f"Approved Leave: {approved_days} days")
+                y -= 15
+            if rejected_days > 0:
+                p.drawString(70, y, f"Rejected Leave: {rejected_days} days")
+                y -= 15
+            if total_leave_days > 4:
+                p.drawString(70, y, f"Penalty applied for: {total_leave_days - 4} days (over 4 days limit)")
+                y -= 15
+            y -= 10
+
         p.setFont("Helvetica-Bold", 12)
         p.drawString(50, y, "Earnings")
         y -= 20
@@ -228,14 +352,26 @@ class PayslipPDFView(APIView):
         p.drawString(50, y, "Deductions")
         y -= 20
         p.setFont("Helvetica", 11)
-        p.drawString(70, y, f"Late ({late_days} days): {late_days * penalty_per_day:,.0f} VND")
-        y -= 15
-        p.drawString(70, y, f"Absent ({absent_days} days): {absent_days * penalty_per_day:,.0f} VND")
-        y -= 15
-        p.drawString(70, y, f"Incomplete ({incomplete_days} days): {int(incomplete_days * penalty_per_day * 0.5):,.0f} VND")
-        y -= 15
-        p.drawString(70, y, f"Leave Penalty: {int(leave_penalty) if leave_penalty > 0 else 0:,.0f} VND")
-        y -= 20
+        if late_days > 0:
+            p.drawString(70, y, f"Late Arrival ({late_days} days × 100,000): {late_days * penalty_per_day:,.0f} VND")
+            y -= 15
+        if absent_days > 0:
+            p.drawString(70, y, f"Absent ({absent_days} days × 100,000): {absent_days * penalty_per_day:,.0f} VND")
+            y -= 15
+        if incomplete_days > 0:
+            p.drawString(70, y, f"Incomplete Attendance ({incomplete_days} days × 50,000): {int(incomplete_days * penalty_per_day * 0.5):,.0f} VND")
+            y -= 15
+        if leave_penalty > 0:
+            p.drawString(70, y, f"Leave Penalty (over {4} days): {leave_penalty:,.0f} VND")
+            y -= 10
+            if leave_penalty_breakdown:
+                p.setFont("Helvetica", 9)
+                for item in leave_penalty_breakdown:
+                    p.drawString(90, y, f"  - {item['leave_type']} ({item['days']} days, {item['penalty_percent']}%): {item['penalty_amount']:,.0f} VND")
+                    y -= 12
+                p.setFont("Helvetica", 11)
+            y -= 5
+        y -= 10
 
         p.setFont("Helvetica-Bold", 12)
         p.drawString(50, y, f"Total Deductions: {int(record.deductions):,.0f} VND")
