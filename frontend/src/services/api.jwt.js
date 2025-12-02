@@ -202,7 +202,11 @@ export const hrapi = {
   createPerformance: (data) => api.post('/performances/', data),
 
   // Payroll
-  getMySalary: () => api.get('/payroll/my-salary/'),
+  // month: optional string 'YYYY-MM' or 'YYYY-MM-DD'
+  getMySalary: (month) => {
+    const query = month ? `?month=${month}` : '';
+    return api.get(`/payroll/my-salary/${query}`);
+  },
   setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
   getPerformances: () => api.get('/performances/'),                     
   getPerformance: (id) => api.get(`/performances/${id}/`),              

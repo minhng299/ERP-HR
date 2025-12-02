@@ -34,7 +34,7 @@ from rest_framework.permissions import IsAuthenticated
 from hrms.models import Employee
 from .models import SalaryRecord
 from .services import PayrollService
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
 class MySalaryView(APIView):
     permission_classes = [IsAuthenticated]
@@ -46,9 +46,25 @@ class MySalaryView(APIView):
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
 
-        today = date.today()
-        # Calculate for current month instead of previous month
-        month = today.replace(day=1)
+        # Allow filtering by month via query param: ?month=YYYY-MM
+        month_param = request.query_params.get('month')
+        if month_param:
+            try:
+                # Expect format YYYY-MM, fallback to full date YYYY-MM-DD
+                try:
+                    month_date = datetime.strptime(month_param, "%Y-%m").date()
+                except ValueError:
+                    month_date = datetime.strptime(month_param, "%Y-%m-%d").date()
+                month = month_date.replace(day=1)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid month format. Use YYYY-MM or YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            today = date.today()
+            # Default: current month
+            month = today.replace(day=1)
 
         from payroll.services import PayrollService
         penalty_per_day = 100000
@@ -65,24 +81,16 @@ class MySalaryView(APIView):
         ).first()
 
         if record:
-            # update lại record qua service
-            record.delete()  # xoá bản cũ để tạo lại cho chuẩn
-            record = PayrollService.create_salary_record(
-                employee_id=employee.id,
-                base_salary=base_salary,
-                bonus=bonus,
-                month=month,
-                penalty_per_day=penalty_per_day
-            )
-        else:
-            # tạo mới
-            record = PayrollService.create_salary_record(
-                employee_id=employee.id,
-                base_salary=base_salary,
-                bonus=bonus,
-                month=month,
-                penalty_per_day=penalty_per_day
-            )
+            # Always recalculate to ensure consistency with latest attendance/leave
+            record.delete()
+
+        record = PayrollService.create_salary_record(
+            employee_id=employee.id,
+            base_salary=base_salary,
+            bonus=bonus,
+            month=month,
+            penalty_per_day=penalty_per_day
+        )
 
         return Response({
             'net_salary': record.total_salary,
