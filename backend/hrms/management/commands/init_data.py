@@ -2,6 +2,8 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
 from hrms.models import Department, Position, Employee, LeaveType, Performance, Attendance
 from datetime import date, time, timedelta, datetime
+import random
+import calendar
 
 class Command(BaseCommand):
     help = 'Initialize database with sample data including enhanced attendance records'
@@ -283,24 +285,130 @@ class Command(BaseCommand):
             if created:
                 self.stdout.write("  Created employee2's not started attendance for today")
 
-        # Create sample performance review
-        emp = emp_objs[1]  # employee
-# Tìm reviewer cùng department và role='Manager'
-        reviewer = Employee.objects.filter(department=emp.department, role__iexact='Manager').first()
+        # Tạo thêm 5 nhân viên mới trong Engineering
+        self.stdout.write("Creating additional 5 Engineering employees...")
 
-        if reviewer:
-            Performance.objects.get_or_create(
+        engineering_dept = Department.objects.get(name='Engineering')
+        engineering_position = Position.objects.filter(department=engineering_dept).first()
+
+        extra_employees = [
+            {'username': f'eng{i}', 'first_name': f'Eng{i}', 'last_name': 'Dev', 'email': f'eng{i}@example.com'}
+            for i in range(1, 6)  # Nếu eng1 đã có, nó sẽ skip bên dưới
+        ]
+
+        for idx, data in enumerate(extra_employees, start=1):
+            try:
+                user, created = User.objects.get_or_create(
+                    username=data['username'],
+                    defaults={
+                        'email': data['email'],
+                        'first_name': data['first_name'],
+                        'last_name': data['last_name'],
+                    }
+                )
+                if created:
+                    user.set_password('admin123')
+                    user.save()
+                    self.stdout.write(f"  Created User: {data['username']}")
+                else:
+                    self.stdout.write(f"  User {data['username']} already exists, skipping.")
+
+                emp, emp_created = Employee.objects.get_or_create(
+                    user=user,
+                    defaults={
+                        'employee_id': f'ENG{100 + idx:03d}',
+                        'phone_number': '+1234567800',
+                        'address': '456 Tech Street',
+                        'date_of_birth': date(1995, 1, 1),
+                        'hire_date': date(2023, 1, 10),
+                        'department': engineering_dept,
+                        'position': engineering_position,
+                        'salary': 7000000,
+                        'manager': None,
+                        'status': 'active',
+                        'profile_picture': '',
+                        'role': 'employee',
+                    }
+                )
+                if emp_created:
+                    self.stdout.write(f"  Added Engineering employee: {data['username']}")
+                else:
+                    self.stdout.write(f"  Employee {data['username']} already exists, skipping.")
+
+            except Exception as e:
+                self.stdout.write(f"  Error creating employee {data['username']}: {e}")
+                continue 
+            
+            # Create sample performance review
+#         emp = emp_objs[1]  # employee
+# # Tìm reviewer cùng department và role='Manager'
+#         reviewer = Employee.objects.filter(department=emp.department, role__iexact='Manager').first()
+
+#         if reviewer:
+#             Performance.objects.get_or_create(
+#                 employee=emp,
+#                 reviewer=reviewer,
+#                 review_period_start=date(2023, 1, 1),
+#                 review_period_end=date(2023, 12, 31),
+#                 overall_rating=5,
+#                 goals_achievement=4,
+#                 communication=5,
+#                 teamwork=4,
+#                 initiative=5,
+#                 comments='Excellent performance throughout the year.',
+#                 employee_comments='Thank you!',
+#             )
+        Performance.objects.all().delete()
+        self.stdout.write("Creating sample performance reviews ONLY for eng1...")
+
+        # Lấy department + reviewer (manager)
+        engineering_dept = Department.objects.get(name="Engineering")
+        reviewer = Employee.objects.filter(department=engineering_dept, role='manager').first()
+
+        if not reviewer:
+            raise Exception("No Manager found in Engineering department!")
+
+        # Lấy employee eng1
+        emp = Employee.objects.filter(
+            department=engineering_dept,
+            user__username="eng1"
+        ).first()
+
+        if not emp:
+            raise Exception("Employee eng1 not found!")
+
+        # Danh sách status mẫu
+        sample_statuses = ["draft", "submitted", "feedback", "finalized"]
+
+        # Tạo review tháng 1 → 4/2024 cho eng1
+        year = 2024
+        for idx, status in enumerate(sample_statuses, start=1):
+
+            month = idx  # 1,2,3,4
+            start_date = date(year, month, 1)
+            end_date = date(year, month, calendar.monthrange(year, month)[1])
+
+            # Check tránh tạo trùng
+            if Performance.objects.filter(
                 employee=emp,
                 reviewer=reviewer,
-                review_period_start=date(2023, 1, 1),
-                review_period_end=date(2023, 12, 31),
-                overall_rating=5,
-                goals_achievement=4,
-                communication=5,
-                teamwork=4,
-                initiative=5,
-                comments='Excellent performance throughout the year.',
-                employee_comments='Thank you!',
+                review_period_start=start_date
+            ).exists():
+                continue
+
+            Performance.objects.create(
+                employee=emp,
+                reviewer=reviewer,
+                review_period_start=start_date,
+                review_period_end=end_date,
+                goals_achievement=random.randint(3, 5),
+                communication=random.randint(3, 5),
+                teamwork=random.randint(3, 5),
+                initiative=random.randint(3, 5),
+                comments=f"Auto-generated review ({status}) for eng1.",
+                status=status,
             )
 
-        self.stdout.write(self.style.SUCCESS('Successfully populated sample data'))
+            self.stdout.write(f"  Created {status} review for eng1 ({year}-{month})")
+
+        self.stdout.write(self.style.SUCCESS('Successfully populated sample data for eng1'))

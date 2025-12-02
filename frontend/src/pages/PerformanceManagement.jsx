@@ -5,7 +5,6 @@ import { useAuth } from "../contexts/AuthContext";
 import NewReviewModal from "../components/performance/NewReviewModal";
 import EditReviewModal from "../components/performance/EditReviewModal";
 import ViewReviewModal from "../components/performance/ViewReviewModal";
-import AnalyticsModal from "../components/performance/AnalyticsModal";
 
 const PerformanceManagement = () => {
   const { user } = useAuth();
@@ -20,16 +19,26 @@ const PerformanceManagement = () => {
   const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
   const [period, setPeriod] = useState("month");
   const [periodAnalytics, setPeriodAnalytics] = useState([]);
+  const [hideFinalized, setHideFinalized] = useState(false);
 
-  const fetchPeriodAnalytics = async (p = period) => {
-    try {
-      let res = await hrapi.getPerformanceAnalyticsByPeriod(p);
-      // DRF pagination => results
-      setPeriodAnalytics(res.data.results || res.data); 
-    } catch (err) {
-      console.error("Failed to fetch period analytics:", err);
+  const filteredPerformances = performances
+  .filter((p) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      p.employee_name.toLowerCase().includes(q) ||
+      p.reviewer_name.toLowerCase().includes(q)
+    );
+  })
+  .filter(p => {
+    // ẩn finalized mặc định nếu không search hoặc filter riêng
+    const isSearching = searchQuery.trim() !== '';
+    const isFilteringStatus = statusFilter !== 'all';
+    if (!isSearching && !isFilteringStatus && p.status === 'finalized') {
+      return false; // hide
     }
-  };
+    return true;
+  });
+
   
   const fetchPerformances = async () => {
     try {
@@ -92,13 +101,6 @@ const PerformanceManagement = () => {
     return 'Excellent';
   };  
 
-  const filteredPerformances = performances.filter((p) => {
-    const q = searchQuery.toLowerCase();
-    return (
-      p.employee_name.toLowerCase().includes(q) ||
-      p.reviewer_name.toLowerCase().includes(q)
-    );
-  });
 
   return (
     <div className="p-6">
@@ -114,17 +116,7 @@ const PerformanceManagement = () => {
             <span>New Review</span>
           </button>
         )}
-        {/* <button
-          className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg"
-          onClick={() => {
-            fetchPeriodAnalytics();
-            setIsAnalyticsModalOpen(true);
-          }}
-        >
-          Analytics
-        </button> */}
       </div>
-
       {/* Filters */}
       <div className="mb-6 flex items-center space-x-4">
         <div>
