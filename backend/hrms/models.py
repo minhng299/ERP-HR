@@ -71,13 +71,15 @@ class Attendance(models.Model):
         ('on_leave', 'On Leave'),
     ]
     
-    employee = models.ForeignKey(Employee, on_delete=models.CASCADE)
-    date = models.DateField()
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE) # nhan vien
+    date = models.DateField() # ngay cham cong
+
     check_in = models.TimeField(null=True, blank=True)
     check_out = models.TimeField(null=True, blank=True)
-    break_duration = models.DurationField(default=timedelta(hours=0))
-    total_hours = models.DurationField(null=True, blank=True)
-    notes = models.TextField(blank=True)
+
+    break_duration = models.DurationField(default=timedelta(hours=0)) # thoi gian nghi trua 
+    total_hours = models.DurationField(null=True, blank=True) # tong gio lam viec trong ngay
+    notes = models.TextField(blank=True) # ghi chu them
     
     # New fields for enhanced tracking
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='not_started')
@@ -102,8 +104,8 @@ class Attendance(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     
     class Meta:
-        unique_together = ('employee', 'date')
-        ordering = ['-date', '-created_at']
+        unique_together = ('employee', 'date') # ensure one record per employee per day
+        ordering = ['-date', '-created_at'] # latest records first
     
     def save(self, *args, **kwargs):
         # Auto-calculate total hours if both check_in and check_out exist
