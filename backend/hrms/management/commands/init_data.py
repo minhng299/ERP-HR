@@ -16,10 +16,11 @@ class Command(BaseCommand):
         LeavePenalty.objects.all().delete()
         Performance.objects.all().delete()
         Employee.objects.all().delete()
+        User.objects.all().delete()
         Department.objects.all().delete()
         Position.objects.all().delete()
         LeaveType.objects.all().delete()
-        User.objects.all().delete()
+        
         
         # ======================================================================
         # PHẦN 1: TẠO DEPARTMENTS VÀ POSITIONS
@@ -426,7 +427,6 @@ class Command(BaseCommand):
         # ======================================================================
         # PHẦN 7: TẠO THÊM NHIỀU EMPLOYEES CHO CÁC PHÒNG BAN KHÁC
         # ======================================================================
-        import random
         extra_emp_objs = []
         for dept in dept_objs:
             pos = dept.position_set.first() or pos_objs[0]
@@ -524,7 +524,6 @@ class Command(BaseCommand):
         # ======================================================================
         # PHẦN 9: TẠO PERFORMANCE REVIEWS CHO ENG1
         # ======================================================================
-        Performance.objects.all().delete()
         self.stdout.write("Creating sample performance reviews ONLY for eng1...")
 
         # Lấy reviewer (manager)

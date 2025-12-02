@@ -459,19 +459,20 @@ class Performance(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
-# Signal handlers for proper cleanup
-@receiver(post_delete, sender=Employee)
-def delete_user_on_employee_delete(sender, instance, **kwargs):
-    """
-    When an Employee is deleted, also delete the associated User.
-    This ensures no orphaned User records remain.
-    """
-    try:
-        if instance.user:
-            instance.user.delete()
-    except User.DoesNotExist:
-        # User was already deleted, nothing to do
-        pass
+# # Signal handlers for proper cleanup
+# @receiver(post_delete, sender=Employee)
+# def delete_user_on_employee_delete(sender, instance, **kwargs):
+#     """
+#     When an Employee is deleted, also delete the associated User.
+#     This ensures no orphaned User records remain.
+#     """
+#     try:
+#         if instance.user:
+#             instance.user.delete()
+#     except User.DoesNotExist:
+#         # User was already deleted, nothing to do
+#         pass
+# không cần vì use đã onebyonefield.cascade với employee
 
 
 @receiver(pre_save, sender=Employee)
@@ -494,12 +495,11 @@ def delete_user_on_employee_delete(sender, instance, **kwargs):
     When an Employee is deleted, also delete the associated User.
     This ensures no orphaned User records remain.
     """
-    try:
-        if instance.user:
-            instance.user.delete()
-    except User.DoesNotExist:
-        # User was already deleted, nothing to do
-        pass
+    if instance.user_id:  # user_id is still present
+        try:
+            User.objects.filter(id=instance.user_id).delete()
+        except Exception:
+            pass
 
 
 @receiver(pre_save, sender=Employee)
