@@ -1,5 +1,5 @@
 from .models import SalaryRecord
-from hrms.models import Attendance, Employee
+from hrms.models import Attendance, Employee, LeaveRequest
 from django.db.models import Q
 from datetime import time, date, timedelta
 from calendar import monthrange
@@ -15,7 +15,9 @@ class PayrollService:
         manager = Employee.objects.get(user=manager_user)
         if manager.role != 'manager':
             raise PermissionError("Chỉ manager mới được phép set lương cơ bản cho nhân viên.")
-        
+
+        print("employee_id:", employee_id)
+        print("new_salary:", new_salary)
         employee = Employee.objects.get(pk=employee_id)
         employee.salary = new_salary
         employee.save()
@@ -115,7 +117,8 @@ class PayrollService:
         working_days_up_to_today = [d for d in working_days if d <= today]
         
         num_days = len(working_days_up_to_today)
-
+        
+        """tính số ngày trễ"""
         late_days = sum(
             1 for a in attendances 
             if a.check_in and a.check_in > a.expected_start
@@ -125,7 +128,7 @@ class PayrollService:
 
         # Số ngày làm thực tế
         # Lấy các ngày nghỉ phép đã được duyệt
-        from hrms.models import LeaveRequest
+        
         approved_leaves = LeaveRequest.objects.filter(
             employee=employee,
             status='approved',
