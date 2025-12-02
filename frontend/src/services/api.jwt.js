@@ -207,8 +207,19 @@ export const hrapi = {
     const query = month ? `?month=${month}` : '';
     return api.get(`/payroll/my-salary/${query}`);
   },
-  getPayslipPdf: (month) => {
+  getTeamSalary: (month) => {
     const query = month ? `?month=${month}` : '';
+    return api.get(`/payroll/team-salary/${query}`);
+  },
+  getEmployeeSalary: (employeeId, month) => {
+    const query = month ? `?month=${month}` : '';
+    return api.get(`/payroll/employee-salary/${employeeId}/${query}`);
+  },
+  getPayslipPdf: (month, employeeId) => {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month);
+    if (employeeId) params.append('employee_id', employeeId);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return api.get(`/payroll/payslip/${query}`, { responseType: 'blob' });
   },
   setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),

@@ -203,9 +203,26 @@ class PayslipPDFView(APIView):
     def get(self, request):
         user = request.user
         try:
-            employee = Employee.objects.get(user=user)
+            current_user_employee = Employee.objects.get(user=user)
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
+
+        # Check if manager wants to view another employee's payslip
+        employee_id_param = request.query_params.get('employee_id')
+        if employee_id_param:
+            # Manager viewing team member's payslip
+            if current_user_employee.role != 'manager':
+                return Response({'error': 'Only managers can view other employees\' payslips'}, status=403)
+            try:
+                employee = Employee.objects.get(id=employee_id_param)
+            except Employee.DoesNotExist:
+                return Response({'error': 'Employee not found'}, status=404)
+            # Check if employee is in the same department
+            if employee.department != current_user_employee.department:
+                return Response({'error': 'You can only view payslips of employees in your department'}, status=403)
+        else:
+            # Viewing own payslip
+            employee = current_user_employee
 
         # Reuse the month parsing logic
         month_param = request.query_params.get('month')
@@ -383,3 +400,245 @@ class PayslipPDFView(APIView):
         p.showPage()
         p.save()
         return response
+
+
+class TeamSalaryView(APIView):
+    """Get salary list for all employees in manager's department"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        try:
+            manager = Employee.objects.get(user=user)
+        except Employee.DoesNotExist:
+            return Response({'error': 'Employee not found'}, status=404)
+        
+        if manager.role != 'manager':
+            return Response({'error': 'Only managers can access team salary'}, status=403)
+
+        # Get month filter
+        month_param = request.query_params.get('month')
+        if month_param:
+            try:
+                try:
+                    month_date = datetime.strptime(month_param, "%Y-%m").date()
+                except ValueError:
+                    month_date = datetime.strptime(month_param, "%Y-%m-%d").date()
+                month = month_date.replace(day=1)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid month format. Use YYYY-MM or YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            today = date.today()
+            month = today.replace(day=1)
+
+        # Get all employees in the same department (excluding manager themselves)
+        team_employees = Employee.objects.filter(
+            department=manager.department,
+            status='active'
+        ).exclude(id=manager.id).select_related('user', 'department', 'position')
+
+        penalty_per_day = 100000
+        team_salaries = []
+
+        for emp in team_employees:
+            # Calculate salary for this employee
+            base_salary = emp.salary
+            overtime_bonus = PayrollService.calculate_overtime_bonus(emp, month)
+            bonus = overtime_bonus
+
+            # Get or create salary record
+            record = SalaryRecord.objects.filter(
+                employee_id=emp.id,
+                month__year=month.year,
+                month__month=month.month
+            ).first()
+
+            if record:
+                record.delete()
+
+            record = PayrollService.create_salary_record(
+                employee_id=emp.id,
+                base_salary=base_salary,
+                bonus=bonus,
+                month=month,
+                penalty_per_day=penalty_per_day
+            )
+
+            team_salaries.append({
+                'employee_id': emp.id,
+                'employee_name': emp.user.get_full_name(),
+                'employee_code': emp.employee_id,
+                'position': emp.position.title,
+                'net_salary': float(record.total_salary),
+                'base_salary': float(record.base_salary),
+                'bonus': float(record.bonus),
+                'deductions': int(record.deductions),
+                'month': str(record.month),
+            })
+
+        return Response({
+            'month': str(month),
+            'team_salaries': team_salaries,
+            'total_employees': len(team_salaries)
+        })
+
+
+class EmployeeSalaryView(APIView):
+    """Get salary details for a specific employee (for manager to view payslip)"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, employee_id):
+        user = request.user
+        try:
+            manager = Employee.objects.get(user=user)
+        except Employee.DoesNotExist:
+            return Response({'error': 'Employee not found'}, status=404)
+        
+        if manager.role != 'manager':
+            return Response({'error': 'Only managers can view employee salary'}, status=403)
+
+        try:
+            employee = Employee.objects.get(id=employee_id)
+        except Employee.DoesNotExist:
+            return Response({'error': 'Employee not found'}, status=404)
+
+        # Check if employee is in the same department
+        if employee.department != manager.department:
+            return Response({'error': 'You can only view salary of employees in your department'}, status=403)
+
+        # Get month filter
+        month_param = request.query_params.get('month')
+        if month_param:
+            try:
+                try:
+                    month_date = datetime.strptime(month_param, "%Y-%m").date()
+                except ValueError:
+                    month_date = datetime.strptime(month_param, "%Y-%m-%d").date()
+                month = month_date.replace(day=1)
+            except ValueError:
+                return Response(
+                    {"error": "Invalid month format. Use YYYY-MM or YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            today = date.today()
+            month = today.replace(day=1)
+
+        # Reuse the same logic as MySalaryView but for the specified employee
+        penalty_per_day = 100000
+        base_salary = employee.salary
+        overtime_bonus = PayrollService.calculate_overtime_bonus(employee, month)
+        bonus = overtime_bonus
+
+        record = SalaryRecord.objects.filter(
+            employee_id=employee.id,
+            month__year=month.year,
+            month__month=month.month
+        ).first()
+
+        if record:
+            record.delete()
+
+        record = PayrollService.create_salary_record(
+            employee_id=employee.id,
+            base_salary=base_salary,
+            bonus=bonus,
+            month=month,
+            penalty_per_day=penalty_per_day
+        )
+
+        # Build payslip-style breakdown (same as MySalaryView)
+        late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
+        basic_deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
+        
+        # Get leave requests details
+        from hrms.models import LeaveRequest
+        start_month = month.replace(day=1)
+        if month.month == 12:
+            next_month = date(month.year + 1, 1, 1)
+        else:
+            next_month = date(month.year, month.month + 1, 1)
+
+        approved_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='approved',
+            start_date__gte=start_month,
+            start_date__lt=next_month
+        )
+        rejected_leaves = LeaveRequest.objects.filter(
+            employee=employee,
+            status='rejected',
+            start_date__gte=start_month,
+            start_date__lt=next_month
+        )
+
+        approved_days = sum([lr.days_requested or 0 for lr in approved_leaves])
+        rejected_days = sum([lr.days_requested or 0 for lr in rejected_leaves])
+        total_leave_days = approved_days
+        
+        # Calculate leave penalty breakdown
+        leave_penalty_amount = 0
+        leave_penalty_breakdown = []
+        if total_leave_days > 4:
+            penalty_days = total_leave_days - 4
+            from hrms.models import LeavePenalty
+            for lr in approved_leaves:
+                if penalty_days <= 0:
+                    break
+                days = lr.days_requested or 0
+                if days > 0:
+                    leave_penalty_obj = LeavePenalty.objects.filter(leave_type=lr.leave_type).first()
+                    percent = float(leave_penalty_obj.penalty_percent) if leave_penalty_obj else 0
+                    apply_days = min(days, penalty_days)
+                    daily_salary = float(base_salary) / 28
+                    penalty_amount = daily_salary * (percent / 100) * apply_days
+                    leave_penalty_amount += penalty_amount
+                    leave_penalty_breakdown.append({
+                        "leave_type": lr.leave_type.name,
+                        "days": apply_days,
+                        "penalty_percent": percent,
+                        "penalty_amount": int(penalty_amount)
+                    })
+                    penalty_days -= apply_days
+
+        payslip = {
+            "employee_name": employee.user.get_full_name(),
+            "employee_id": employee.id,
+            "month": str(record.month),
+            "base_salary": float(record.base_salary),
+            "overtime_bonus": float(overtime_bonus),
+            "other_bonus": float(record.bonus) - float(overtime_bonus),
+            "gross_salary": float(record.base_salary) + float(record.bonus),
+            "late_days": late_days,
+            "absent_days": absent_days,
+            "incomplete_days": incomplete_days,
+            "working_days": num_days,
+            "late_penalty": late_days * penalty_per_day,
+            "absent_penalty": absent_days * penalty_per_day,
+            "incomplete_penalty": int(incomplete_days * penalty_per_day * 0.5),
+            "leave_penalty": int(leave_penalty_amount) if leave_penalty_amount > 0 else 0,
+            "leave_penalty_breakdown": leave_penalty_breakdown,
+            "approved_leave_days": approved_days,
+            "rejected_leave_days": rejected_days,
+            "total_leave_days": total_leave_days,
+            "leave_penalty_threshold": 4,
+            "total_deductions": int(record.deductions),
+            "net_salary": float(record.total_salary),
+        }
+
+        return Response({
+            'net_salary': record.total_salary,
+            'base_salary': record.base_salary,
+            'bonus': record.bonus,
+            'deductions': int(record.deductions),
+            'month': record.month,
+            'total_hours_worked': float(record.total_hours_worked),
+            'overtime_hours': float(record.overtime_hours),
+            'late_days': record.late_days,
+            'absent_days': record.absent_days,
+            'incomplete_days': record.incomplete_days,
+            'payslip': payslip,
+        })
