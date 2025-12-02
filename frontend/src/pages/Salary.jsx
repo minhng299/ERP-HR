@@ -1,17 +1,48 @@
+/**
+ * Component Salary - Quản lý lương và payslip
+ * ============================================
+ * 
+ * Chức năng theo Role:
+ * --------------------
+ * 
+ * 1. EMPLOYEE (Nhân viên):
+ *    - Chỉ xem được lương của chính mình
+ *    - Có thể xem payslip chi tiết của mình
+ *    - Có thể tải PDF payslip của mình
+ * 
+ * 2. MANAGER (Quản lý):
+ *    - Tab "Your Salary": Xem lương của chính manager
+ *    - Tab "Team Salary": Xem danh sách lương của tất cả nhân viên trong cùng phòng ban
+ *    - Click vào card nhân viên trong Team Salary để xem payslip chi tiết của nhân viên đó
+ *    - Có thể tải PDF payslip của chính mình hoặc của nhân viên trong team
+ */
+
 import React, { useEffect, useState } from 'react';
 import { hrapi } from '../services/api.jwt';
 import { useAuth } from '../contexts/AuthContext';
 
 const Salary = () => {
+  // ==========================================================================
+  // STATE MANAGEMENT
+  // ==========================================================================
+  
+  // Lấy thông tin user từ AuthContext để kiểm tra role
   const { user } = useAuth();
+  // Kiểm tra xem user có phải manager không
   const isManager = user?.role === 'manager';
+  // Tab hiện tại đang active (chỉ dùng cho manager)
   const [activeTab, setActiveTab] = useState('your-salary');
   
+  // State cho lương của chính user (cả manager và employee đều có)
   const [salary, setSalary] = useState(null);
+  // State cho danh sách lương của team (chỉ manager mới có)
   const [teamSalaries, setTeamSalaries] = useState([]);
+  // Loading states
   const [loading, setLoading] = useState(true);
   const [teamLoading, setTeamLoading] = useState(false);
   const [error, setError] = useState(false);
+  
+  // Tháng được chọn để xem lương (format: YYYY-MM)
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
     const year = now.getFullYear();
@@ -19,11 +50,23 @@ const Salary = () => {
     return `${year}-${month}`; // format for <input type="month">
   });
 
+  // State cho modal payslip
   const [showPayslip, setShowPayslip] = useState(false);
+  // ID của nhân viên đang được xem payslip (null nếu xem của chính mình)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(null);
+  // Data payslip hiện tại đang hiển thị
   const [payslipData, setPayslipData] = useState(null);
+  // State khi đang tải PDF
   const [downloading, setDownloading] = useState(false);
 
+  // ==========================================================================
+  // FUNCTIONS - Các hàm xử lý
+  // ==========================================================================
+
+  /**
+   * Hàm fetch lương của chính mình
+   * Cả manager và employee đều dùng hàm này
+   */
   const fetchSalary = (monthValue) => {
     setLoading(true);
     setError(false);
@@ -38,6 +81,10 @@ const Salary = () => {
       });
   };
 
+  /**
+   * Hàm fetch danh sách lương của team
+   * CHỈ MANAGER mới gọi hàm này
+   */
   const fetchTeamSalary = (monthValue) => {
     setTeamLoading(true);
     hrapi.getTeamSalary && hrapi.getTeamSalary(monthValue)
@@ -50,16 +97,26 @@ const Salary = () => {
       });
   };
 
+  /**
+   * useEffect: Tự động fetch data khi tháng thay đổi hoặc khi user là manager
+   */
   useEffect(() => {
+    // Luôn fetch lương của chính mình
     fetchSalary(selectedMonth);
+    // Nếu là manager thì fetch thêm danh sách lương team
     if (isManager) {
       fetchTeamSalary(selectedMonth);
     }
   }, [selectedMonth, isManager]);
 
+  /**
+   * Hàm xử lý khi manager click vào card nhân viên để xem payslip
+   * CHỈ MANAGER mới dùng hàm này
+   */
   const handleViewEmployeePayslip = async (employeeId) => {
     try {
       setLoading(true);
+      // Gọi API để lấy chi tiết payslip của nhân viên đó
       const res = await hrapi.getEmployeeSalary(employeeId, selectedMonth);
       setPayslipData(res.data);
       setSelectedEmployeeId(employeeId);
@@ -71,6 +128,11 @@ const Salary = () => {
     }
   };
 
+  /**
+   * Hàm tải PDF payslip
+   * - Nếu employeeId = null: tải payslip của chính mình
+   * - Nếu employeeId != null: manager tải payslip của nhân viên đó
+   */
   const handleDownloadPdf = async (employeeId = null) => {
     try {
       setDownloading(true);
@@ -79,6 +141,7 @@ const Salary = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
+      // Tạo tên file khác nhau tùy vào xem của mình hay của nhân viên
       const filename = employeeId 
         ? `payslip_employee_${employeeId}_${selectedMonth}.pdf`
         : `payslip_${selectedMonth}.pdf`;
@@ -92,14 +155,23 @@ const Salary = () => {
     }
   };
 
+  // Lấy data payslip hiện tại (của mình hoặc của nhân viên đang xem)
   const currentPayslipData = payslipData || salary;
 
+  // ==========================================================================
+  // RENDER - Hiển thị UI
+  // ==========================================================================
+
+  // Loading state
   if (loading && !payslipData) return <div className="p-6">Loading salary...</div>;
+  // Error state
   if (error) return <div className="p-6 text-red-500">Failed to load salary data.</div>;
+  // No data state
   if (!salary && !payslipData) return <div className="p-6">No salary data available.</div>;
 
   return (
     <div className="p-6">
+      {/* Header với selector tháng */}
       <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
         <h2 className="text-2xl font-bold">Salary</h2>
         <div className="flex items-center gap-2">
@@ -116,7 +188,13 @@ const Salary = () => {
         </div>
       </div>
 
-      {/* Tabs for Manager */}
+      {/* ======================================================================
+          TABS CHO MANAGER
+          ======================================================================
+          Chỉ hiển thị khi user là manager
+          - Tab "Your Salary": Xem lương của chính manager
+          - Tab "Team Salary": Xem danh sách lương của team
+      */}
       {isManager && (
         <div className="mb-4 border-b border-gray-200">
           <div className="flex space-x-4">
@@ -144,12 +222,22 @@ const Salary = () => {
         </div>
       )}
 
-      {/* Your Salary Tab */}
+      {/* ======================================================================
+          TAB "YOUR SALARY"
+          ======================================================================
+          Hiển thị khi:
+          - Employee: luôn hiển thị (vì không có tabs)
+          - Manager: chỉ hiển thị khi activeTab === 'your-salary'
+          
+          Card hiển thị lương của chính user đang đăng nhập
+          Click vào card để xem payslip chi tiết
+      */}
       {(activeTab === 'your-salary' || !isManager) && (
         <div>
           <div
             className="bg-white rounded-lg shadow p-6 max-w-md cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => {
+              // Reset state khi xem payslip của chính mình
               setPayslipData(null);
               setSelectedEmployeeId(null);
               setShowPayslip(true);
@@ -168,7 +256,17 @@ const Salary = () => {
         </div>
       )}
 
-      {/* Team Salary Tab */}
+      {/* ======================================================================
+          TAB "TEAM SALARY" (CHỈ MANAGER)
+          ======================================================================
+          Hiển thị danh sách lương của tất cả nhân viên trong cùng phòng ban
+          Mỗi card hiển thị:
+          - Tên nhân viên
+          - Position và Employee Code
+          - Net Salary, Base, Bonus, Deductions
+          
+          Click vào card bất kỳ để xem payslip chi tiết của nhân viên đó
+      */}
       {isManager && activeTab === 'team-salary' && (
         <div>
           {teamLoading ? (
@@ -202,7 +300,17 @@ const Salary = () => {
         </div>
       )}
 
-      {/* Payslip Modal */}
+      {/* ======================================================================
+          MODAL PAYSLIP
+          ======================================================================
+          Modal hiển thị payslip chi tiết
+          - Employee: chỉ xem được payslip của chính mình
+          - Manager: có thể xem payslip của chính mình hoặc của nhân viên trong team
+          
+          Modal này được dùng chung cho cả 2 trường hợp:
+          - Khi xem payslip của chính mình: currentPayslipData = salary
+          - Khi manager xem payslip của nhân viên: currentPayslipData = payslipData
+      */}
       {showPayslip && currentPayslipData && (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-gray bg-opacity-30"
@@ -217,6 +325,7 @@ const Salary = () => {
             className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Header modal */}
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h3 className="text-xl font-semibold">Payslip</h3>
               <button
@@ -231,18 +340,21 @@ const Salary = () => {
               </button>
             </div>
 
+            {/* Nội dung payslip */}
             <div className="px-6 py-4 text-sm leading-relaxed">
+              {/* Header payslip */}
               <div className="mb-4 text-center">
                 <div className="text-lg font-bold">PAYSLIP</div>
                 <div className="text-gray-600">Month: {currentPayslipData.payslip?.month || currentPayslipData.month}</div>
               </div>
 
+              {/* Thông tin nhân viên */}
               <div className="mb-4 border-b pb-3">
                 <div><span className="font-semibold">Employee:</span> {currentPayslipData.payslip?.employee_name || user?.user?.first_name + ' ' + user?.user?.last_name}</div>
                 <div><span className="font-semibold">Employee ID:</span> {currentPayslipData.payslip?.employee_id || user?.id}</div>
               </div>
 
-              {/* Leave Information Section */}
+              {/* Phần thông tin nghỉ phép */}
               {(currentPayslipData.payslip?.approved_leave_days > 0 || currentPayslipData.payslip?.rejected_leave_days > 0) && (
                 <div className="mb-4 p-3 bg-blue-50 rounded border border-blue-200">
                   <div className="font-semibold mb-2 text-blue-800">Leave Information</div>
@@ -272,7 +384,9 @@ const Salary = () => {
                 </div>
               )}
 
+              {/* Grid hiển thị Earnings và Deductions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                {/* Cột trái: Earnings (Thu nhập) */}
                 <div>
                   <div className="font-semibold mb-2">Earnings</div>
                   <div className="flex justify-between"><span>Base Salary</span><span>{currentPayslipData.payslip?.base_salary?.toLocaleString()} VND</span></div>
@@ -284,10 +398,11 @@ const Salary = () => {
                   </div>
                 </div>
 
+                {/* Cột phải: Deductions (Khấu trừ) */}
                 <div>
                   <div className="font-semibold mb-2">Deductions</div>
                   
-                  {/* Late Penalty */}
+                  {/* Phạt đi muộn */}
                   {currentPayslipData.payslip?.late_days > 0 && (
                     <div className="flex justify-between text-gray-700">
                       <span>Late Arrival ({currentPayslipData.payslip?.late_days} days × 100,000)</span>
@@ -295,7 +410,7 @@ const Salary = () => {
                     </div>
                   )}
                   
-                  {/* Absent Penalty */}
+                  {/* Phạt vắng mặt */}
                   {currentPayslipData.payslip?.absent_days > 0 && (
                     <div className="flex justify-between text-gray-700">
                       <span>Absent ({currentPayslipData.payslip?.absent_days} days × 100,000)</span>
@@ -303,7 +418,7 @@ const Salary = () => {
                     </div>
                   )}
                   
-                  {/* Incomplete Penalty */}
+                  {/* Phạt chấm công không đầy đủ */}
                   {currentPayslipData.payslip?.incomplete_days > 0 && (
                     <div className="flex justify-between text-gray-700">
                       <span>Incomplete Attendance ({currentPayslipData.payslip?.incomplete_days} days × 50,000)</span>
@@ -311,13 +426,14 @@ const Salary = () => {
                     </div>
                   )}
                   
-                  {/* Leave Penalty - detailed breakdown */}
+                  {/* Phạt nghỉ phép quá số ngày quy định (chi tiết breakdown) */}
                   {currentPayslipData.payslip?.leave_penalty > 0 && (
                     <div className="mt-2 pt-2 border-t border-gray-200">
                       <div className="flex justify-between text-gray-700 mb-1">
                         <span className="font-semibold">Leave Penalty (over {currentPayslipData.payslip?.leave_penalty_threshold} days)</span>
                         <span className="text-red-600 font-semibold">-{currentPayslipData.payslip?.leave_penalty?.toLocaleString()} VND</span>
                       </div>
+                      {/* Breakdown chi tiết từng loại phép bị phạt */}
                       {currentPayslipData.payslip?.leave_penalty_breakdown && currentPayslipData.payslip.leave_penalty_breakdown.length > 0 && (
                         <div className="ml-4 text-xs text-gray-600 space-y-1">
                           {currentPayslipData.payslip.leave_penalty_breakdown.map((item, idx) => (
@@ -331,6 +447,7 @@ const Salary = () => {
                     </div>
                   )}
                   
+                  {/* Tổng khấu trừ */}
                   <div className="flex justify-between font-semibold border-t mt-2 pt-2">
                     <span>Total Deductions</span>
                     <span className="text-red-600">{currentPayslipData.payslip?.total_deductions?.toLocaleString()} VND</span>
@@ -338,10 +455,14 @@ const Salary = () => {
                 </div>
               </div>
 
+              {/* Footer: Net Salary và nút Download PDF */}
               <div className="border-t pt-3 mt-2 flex justify-between items-center">
                 <div className="font-semibold text-lg">
                   Net Salary: <span className="text-green-600">{currentPayslipData.payslip?.net_salary?.toLocaleString()} VND</span>
                 </div>
+                {/* Nút download PDF: 
+                    - Nếu selectedEmployeeId = null: tải PDF của chính mình
+                    - Nếu selectedEmployeeId != null: manager tải PDF của nhân viên đó */}
                 <button
                   onClick={() => handleDownloadPdf(selectedEmployeeId)}
                   disabled={downloading}

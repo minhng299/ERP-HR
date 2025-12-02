@@ -1,3 +1,18 @@
+"""
+Backend Views cho Payroll System
+=================================
+
+Các view này xử lý logic tính lương và payslip cho cả Manager và Employee:
+
+1. SetBaseSalaryView: CHỈ MANAGER - Đặt lương cơ bản cho nhân viên
+2. MySalaryView: CẢ MANAGER VÀ EMPLOYEE - Xem lương của chính mình
+3. PayslipPDFView: CẢ MANAGER VÀ EMPLOYEE - Tải payslip PDF
+   - Employee: chỉ tải được payslip của chính mình
+   - Manager: có thể tải payslip của nhân viên trong cùng phòng ban
+4. TeamSalaryView: CHỈ MANAGER - Xem danh sách lương của team
+5. EmployeeSalaryView: CHỈ MANAGER - Xem chi tiết payslip của một nhân viên cụ thể
+"""
+
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -7,6 +22,13 @@ from .services import PayrollService
 from django.http import HttpResponse
 from reportlab.pdfgen import canvas
 
+# ============================================================================
+# VIEW 1: SetBaseSalaryView
+# ============================================================================
+# CHỈ MANAGER mới được sử dụng
+# Chức năng: Manager đặt lương cơ bản cho nhân viên trong phòng ban của mình
+# Endpoint: POST /api/payroll/set-base-salary/
+# ============================================================================
 class SetBaseSalaryView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -30,6 +52,7 @@ class SetBaseSalaryView(APIView):
             return Response({'error': str(e)}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -38,6 +61,14 @@ from .models import SalaryRecord
 from .services import PayrollService
 from datetime import date, timedelta, datetime
 
+# ============================================================================
+# VIEW 2: MySalaryView
+# ============================================================================
+# CẢ MANAGER VÀ EMPLOYEE đều có thể sử dụng
+# Chức năng: Xem lương của chính mình (người đang đăng nhập)
+# Endpoint: GET /api/payroll/my-salary/?month=YYYY-MM
+# Trả về: Thông tin lương chi tiết + payslip breakdown
+# ============================================================================
 class MySalaryView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -48,11 +79,11 @@ class MySalaryView(APIView):
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
 
-        # Allow filtering by month via query param: ?month=YYYY-MM
+        # Cho phép filter theo tháng qua query param: ?month=YYYY-MM
         month_param = request.query_params.get('month')
         if month_param:
             try:
-                # Expect format YYYY-MM, fallback to full date YYYY-MM-DD
+                # Hỗ trợ format YYYY-MM hoặc YYYY-MM-DD
                 try:
                     month_date = datetime.strptime(month_param, "%Y-%m").date()
                 except ValueError:
@@ -65,15 +96,14 @@ class MySalaryView(APIView):
                 )
         else:
             today = date.today()
-            # Default: current month
+            # Mặc định: tháng hiện tại
             month = today.replace(day=1)
 
         from payroll.services import PayrollService
-        penalty_per_day = 100000
+        penalty_per_day = 100000  # Mức phạt mỗi ngày: 100,000 VND
         base_salary = employee.salary
         overtime_bonus = PayrollService.calculate_overtime_bonus(employee, month)
         bonus = overtime_bonus
-        # Use the month we calculated above instead of recalculating
 
         # --- Gọi service để tạo/ cập nhật SalaryRecord ---
         record = SalaryRecord.objects.filter(
@@ -83,7 +113,7 @@ class MySalaryView(APIView):
         ).first()
 
         if record:
-            # Always recalculate to ensure consistency with latest attendance/leave
+            # Luôn tính lại để đảm bảo nhất quán với attendance/leave mới nhất
             record.delete()
 
         record = PayrollService.create_salary_record(
@@ -94,12 +124,12 @@ class MySalaryView(APIView):
             penalty_per_day=penalty_per_day
         )
 
-        # Build payslip-style breakdown (similar to debug_salary.py)
+        # Xây dựng breakdown chi tiết cho payslip (tương tự debug_salary.py)
         late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
         basic_deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
         leave_penalty = float(record.deductions) - basic_deductions
 
-        # Get leave requests details for the month
+        # Lấy thông tin chi tiết về đơn nghỉ phép trong tháng
         from hrms.models import LeaveRequest
         start_month = month.replace(day=1)
         if month.month == 12:
@@ -107,7 +137,7 @@ class MySalaryView(APIView):
         else:
             next_month = date(month.year, month.month + 1, 1)
 
-        # Query approved and rejected leaves in this month
+        # Query các đơn nghỉ được duyệt và bị từ chối trong tháng này
         approved_leaves = LeaveRequest.objects.filter(
             employee=employee,
             status='approved',
@@ -121,15 +151,16 @@ class MySalaryView(APIView):
             start_date__lt=next_month
         )
 
-        # Calculate total approved/rejected days
+        # Tính tổng số ngày nghỉ được duyệt/bị từ chối
         approved_days = sum([lr.days_requested or 0 for lr in approved_leaves])
         rejected_days = sum([lr.days_requested or 0 for lr in rejected_leaves])
 
-        # Calculate leave penalty breakdown (when > 4 days)
+        # Tính breakdown phạt nghỉ phép (khi > 4 ngày)
         total_leave_days = approved_days
         leave_penalty_breakdown = []
         leave_penalty_amount = 0
         if total_leave_days > 4:
+            # Chỉ tính phạt cho số ngày vượt quá 4 ngày
             penalty_days = total_leave_days - 4
             from hrms.models import LeavePenalty
             for lr in approved_leaves:
@@ -151,6 +182,7 @@ class MySalaryView(APIView):
                     })
                     penalty_days -= apply_days
 
+        # Xây dựng object payslip với đầy đủ thông tin
         payslip = {
             "employee_name": employee.user.get_full_name(),
             "employee_id": employee.id,
@@ -196,6 +228,17 @@ class MySalaryView(APIView):
         })
 
 
+# ============================================================================
+# VIEW 3: PayslipPDFView
+# ============================================================================
+# CẢ MANAGER VÀ EMPLOYEE đều có thể sử dụng
+# Chức năng: Tạo và tải payslip dưới dạng PDF
+# Endpoint: GET /api/payroll/payslip/?month=YYYY-MM&employee_id=123
+# 
+# Phân quyền:
+# - Employee: chỉ tải được payslip của chính mình (không truyền employee_id)
+# - Manager: có thể tải payslip của nhân viên trong cùng phòng ban (truyền employee_id)
+# ============================================================================
 class PayslipPDFView(APIView):
     """Generate payslip as PDF for a given month"""
     permission_classes = [IsAuthenticated]
@@ -207,24 +250,24 @@ class PayslipPDFView(APIView):
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
 
-        # Check if manager wants to view another employee's payslip
+        # Kiểm tra xem manager có muốn xem payslip của nhân viên khác không
         employee_id_param = request.query_params.get('employee_id')
         if employee_id_param:
-            # Manager viewing team member's payslip
+            # Manager đang xem payslip của thành viên team
             if current_user_employee.role != 'manager':
                 return Response({'error': 'Only managers can view other employees\' payslips'}, status=403)
             try:
                 employee = Employee.objects.get(id=employee_id_param)
             except Employee.DoesNotExist:
                 return Response({'error': 'Employee not found'}, status=404)
-            # Check if employee is in the same department
+            # Kiểm tra nhân viên có cùng phòng ban không
             if employee.department != current_user_employee.department:
                 return Response({'error': 'You can only view payslips of employees in your department'}, status=403)
         else:
-            # Viewing own payslip
+            # Xem payslip của chính mình
             employee = current_user_employee
 
-        # Reuse the month parsing logic
+        # Parse tháng từ query param
         month_param = request.query_params.get('month')
         if month_param:
             try:
@@ -267,7 +310,7 @@ class PayslipPDFView(APIView):
         late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
         basic_deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
         
-        # Get leave requests details for PDF
+        # Lấy thông tin chi tiết về đơn nghỉ phép cho PDF
         from hrms.models import LeaveRequest, LeavePenalty
         start_month = month.replace(day=1)
         if month.month == 12:
@@ -292,7 +335,7 @@ class PayslipPDFView(APIView):
         rejected_days = sum([lr.days_requested or 0 for lr in rejected_leaves])
         total_leave_days = approved_days
         
-        # Calculate leave penalty breakdown
+        # Tính breakdown phạt nghỉ phép
         leave_penalty_amount = 0
         leave_penalty_breakdown = []
         if total_leave_days > 4:
@@ -318,7 +361,7 @@ class PayslipPDFView(APIView):
         
         leave_penalty = int(leave_penalty_amount) if leave_penalty_amount > 0 else 0
 
-        # Create PDF response
+        # Tạo PDF response
         response = HttpResponse(content_type='application/pdf')
         filename = f"payslip_{employee.id}_{month.strftime('%Y_%m')}.pdf"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
@@ -326,6 +369,7 @@ class PayslipPDFView(APIView):
         p = canvas.Canvas(response)
         y = 800
 
+        # Header PDF
         p.setFont("Helvetica-Bold", 16)
         p.drawString(200, y, "PAYSLIP")
         y -= 40
@@ -336,7 +380,7 @@ class PayslipPDFView(APIView):
         p.drawString(50, y, f"Month: {month.strftime('%Y-%m')}")
         y -= 30
 
-        # Leave Information Section
+        # Phần thông tin nghỉ phép
         if approved_days > 0 or rejected_days > 0:
             p.setFont("Helvetica-Bold", 12)
             p.drawString(50, y, "Leave Information")
@@ -353,6 +397,7 @@ class PayslipPDFView(APIView):
                 y -= 15
             y -= 10
 
+        # Phần Earnings (Thu nhập)
         p.setFont("Helvetica-Bold", 12)
         p.drawString(50, y, "Earnings")
         y -= 20
@@ -365,6 +410,7 @@ class PayslipPDFView(APIView):
         p.drawString(70, y, f"Other Bonus: {other_bonus:,.0f} VND")
         y -= 20
 
+        # Phần Deductions (Khấu trừ)
         p.setFont("Helvetica-Bold", 12)
         p.drawString(50, y, "Deductions")
         y -= 20
@@ -390,6 +436,7 @@ class PayslipPDFView(APIView):
             y -= 5
         y -= 10
 
+        # Tổng khấu trừ và lương thực nhận
         p.setFont("Helvetica-Bold", 12)
         p.drawString(50, y, f"Total Deductions: {int(record.deductions):,.0f} VND")
         y -= 30
@@ -402,6 +449,14 @@ class PayslipPDFView(APIView):
         return response
 
 
+# ============================================================================
+# VIEW 4: TeamSalaryView
+# ============================================================================
+# CHỈ MANAGER mới được sử dụng
+# Chức năng: Manager xem danh sách lương của tất cả nhân viên trong cùng phòng ban
+# Endpoint: GET /api/payroll/team-salary/?month=YYYY-MM
+# Trả về: Danh sách lương của từng nhân viên trong team (không bao gồm chính manager)
+# ============================================================================
 class TeamSalaryView(APIView):
     """Get salary list for all employees in manager's department"""
     permission_classes = [IsAuthenticated]
@@ -413,10 +468,11 @@ class TeamSalaryView(APIView):
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
         
+        # Kiểm tra quyền: chỉ manager mới được truy cập
         if manager.role != 'manager':
             return Response({'error': 'Only managers can access team salary'}, status=403)
 
-        # Get month filter
+        # Lấy filter tháng từ query param
         month_param = request.query_params.get('month')
         if month_param:
             try:
@@ -434,7 +490,7 @@ class TeamSalaryView(APIView):
             today = date.today()
             month = today.replace(day=1)
 
-        # Get all employees in the same department (excluding manager themselves)
+        # Lấy tất cả nhân viên trong cùng phòng ban (trừ chính manager)
         team_employees = Employee.objects.filter(
             department=manager.department,
             status='active'
@@ -443,13 +499,14 @@ class TeamSalaryView(APIView):
         penalty_per_day = 100000
         team_salaries = []
 
+        # Tính lương cho từng nhân viên trong team
         for emp in team_employees:
-            # Calculate salary for this employee
+            # Tính lương cho nhân viên này
             base_salary = emp.salary
             overtime_bonus = PayrollService.calculate_overtime_bonus(emp, month)
             bonus = overtime_bonus
 
-            # Get or create salary record
+            # Lấy hoặc tạo salary record
             record = SalaryRecord.objects.filter(
                 employee_id=emp.id,
                 month__year=month.year,
@@ -467,6 +524,7 @@ class TeamSalaryView(APIView):
                 penalty_per_day=penalty_per_day
             )
 
+            # Thêm vào danh sách team salaries
             team_salaries.append({
                 'employee_id': emp.id,
                 'employee_name': emp.user.get_full_name(),
@@ -486,6 +544,15 @@ class TeamSalaryView(APIView):
         })
 
 
+# ============================================================================
+# VIEW 5: EmployeeSalaryView
+# ============================================================================
+# CHỈ MANAGER mới được sử dụng
+# Chức năng: Manager xem chi tiết payslip của một nhân viên cụ thể trong team
+# Endpoint: GET /api/payroll/employee-salary/<employee_id>/?month=YYYY-MM
+# Trả về: Thông tin payslip chi tiết của nhân viên đó (giống MySalaryView)
+# Bảo mật: Manager chỉ xem được nhân viên trong cùng phòng ban
+# ============================================================================
 class EmployeeSalaryView(APIView):
     """Get salary details for a specific employee (for manager to view payslip)"""
     permission_classes = [IsAuthenticated]
@@ -497,6 +564,7 @@ class EmployeeSalaryView(APIView):
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
         
+        # Kiểm tra quyền: chỉ manager mới được xem
         if manager.role != 'manager':
             return Response({'error': 'Only managers can view employee salary'}, status=403)
 
@@ -505,11 +573,11 @@ class EmployeeSalaryView(APIView):
         except Employee.DoesNotExist:
             return Response({'error': 'Employee not found'}, status=404)
 
-        # Check if employee is in the same department
+        # Kiểm tra nhân viên có cùng phòng ban không
         if employee.department != manager.department:
             return Response({'error': 'You can only view salary of employees in your department'}, status=403)
 
-        # Get month filter
+        # Lấy filter tháng từ query param
         month_param = request.query_params.get('month')
         if month_param:
             try:
@@ -527,7 +595,7 @@ class EmployeeSalaryView(APIView):
             today = date.today()
             month = today.replace(day=1)
 
-        # Reuse the same logic as MySalaryView but for the specified employee
+        # Tái sử dụng logic giống MySalaryView nhưng cho nhân viên được chỉ định
         penalty_per_day = 100000
         base_salary = employee.salary
         overtime_bonus = PayrollService.calculate_overtime_bonus(employee, month)
@@ -550,11 +618,11 @@ class EmployeeSalaryView(APIView):
             penalty_per_day=penalty_per_day
         )
 
-        # Build payslip-style breakdown (same as MySalaryView)
+        # Xây dựng breakdown payslip (giống MySalaryView)
         late_days, absent_days, num_days, incomplete_days = PayrollService.get_late_or_absent_days(employee, month)
         basic_deductions = (late_days + absent_days) * penalty_per_day + (incomplete_days * penalty_per_day * 0.5)
         
-        # Get leave requests details
+        # Lấy thông tin chi tiết về đơn nghỉ phép
         from hrms.models import LeaveRequest
         start_month = month.replace(day=1)
         if month.month == 12:
@@ -579,7 +647,7 @@ class EmployeeSalaryView(APIView):
         rejected_days = sum([lr.days_requested or 0 for lr in rejected_leaves])
         total_leave_days = approved_days
         
-        # Calculate leave penalty breakdown
+        # Tính breakdown phạt nghỉ phép
         leave_penalty_amount = 0
         leave_penalty_breakdown = []
         if total_leave_days > 4:
@@ -604,6 +672,7 @@ class EmployeeSalaryView(APIView):
                     })
                     penalty_days -= apply_days
 
+        # Xây dựng object payslip
         payslip = {
             "employee_name": employee.user.get_full_name(),
             "employee_id": employee.id,
