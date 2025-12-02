@@ -211,6 +211,8 @@ const CreateLeaveRequest = ({ onSuccess }) => {
         reason: '',
       });
       setErrors({});
+
+      window.location.reload();
     } catch (error) {
       console.error("Gửi đơn nghỉ thất bại:", error.response?.data || error.message);
       alert('Gửi đơn nghỉ thất bại! Vui lòng kiểm tra lại thông tin.');
@@ -287,7 +289,10 @@ const CreateLeaveRequest = ({ onSuccess }) => {
         {loading ? 'Đang gửi...' : 'Gửi đơn nghỉ'}
       </button>
     </form>
+    
   );
+  
+
 };
 
 export default CreateLeaveRequest;

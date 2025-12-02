@@ -10,6 +10,8 @@ from django.contrib.auth import authenticate
 from rest_framework.permissions import IsAuthenticated
 
 from django.utils import timezone
+from django.conf import settings
+import pytz
 from datetime import timedelta
 from .models import Employee, Department, Position, Attendance, LeaveRequest, LeaveType, Performance
 from .serializers import (
@@ -172,6 +174,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             
         return queryset.order_by('-date')
     
+    def get_vietnam_time(self):
+        """Get current time in Vietnam timezone"""
+        vietnam_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+        utc_now = timezone.now()
+        vietnam_now = utc_now.astimezone(vietnam_tz)
+        return vietnam_now
+    
     @action(detail=False, methods=['post'])
     def check_in(self, request):
         """Real-time check-in with current timestamp"""
@@ -181,8 +190,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Employee profile not found'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
-        today = timezone.now().date()
-        current_time = timezone.now().time()
+        vietnam_now = self.get_vietnam_time()
+        today = vietnam_now.date()
+        current_time = vietnam_now.time()
         
         # Check if employee is on approved leave today
         approved_leave = LeaveRequest.objects.filter(
@@ -236,7 +246,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         
         return Response({
             'message': 'Checked in successfully',
-            'time': current_time.strftime('%I:%M %p'),
+            'time': current_time.strftime('%I:%M %p'),  # 12-hour format
+            'vietnam_time': vietnam_now.strftime('%Y-%m-%d %I:%M %p'),
             'is_late': attendance.is_late(),
             'attendance': serializer.data
         })
@@ -249,9 +260,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         except Employee.DoesNotExist:
             return Response({'error': 'Employee profile not found'}, 
                           status=status.HTTP_404_NOT_FOUND)
-        
-        today = timezone.now().date()
-        current_time = timezone.now().time()
+
+        vietnam_now = self.get_vietnam_time()
+        today = vietnam_now.date()
+        current_time = vietnam_now.time()
         
         try:
             attendance = Attendance.objects.get(employee=employee, date=today)
@@ -285,7 +297,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         
         return Response({
             'message': 'Checked out successfully',
-            'time': current_time.strftime('%H:%M'),
+            'time': current_time.strftime('%I:%M %p'),  # 12-hour format
+            'vietnam_time': vietnam_now.strftime('%Y-%m-%d %I:%M %p'),
             'total_hours': attendance.hours_worked_display,
             'is_early_departure': attendance.is_early_departure(),
             'overtime_hours': str(attendance.overtime_hours) if attendance.overtime_hours else None,
@@ -373,7 +386,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Employee profile not found'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
-        today = timezone.now().date()
+        # Use Vietnam timezone
+        vietnam_now = self.get_vietnam_time()
+        today = vietnam_now.date()
         
         # Check if employee is on approved leave today
         approved_leave = LeaveRequest.objects.filter(
@@ -411,7 +426,9 @@ class AttendanceViewSet(viewsets.ModelViewSet):
             'can_check_out': attendance.can_check_out(),
             'can_start_break': attendance.can_start_break(),
             'can_end_break': attendance.can_end_break(),
-            'current_time': timezone.now().time().strftime('%I:%M %p')
+            'current_time': vietnam_now.strftime('%I:%M %p'),
+            'current_date': today.strftime('%Y-%m-%d'),
+            'timezone': 'Asia/Ho_Chi_Minh'
         })
     
     @action(detail=False, methods=['get'])
