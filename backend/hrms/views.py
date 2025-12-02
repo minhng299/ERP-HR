@@ -21,6 +21,10 @@ from .serializers import (
 )
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate
+
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+
 class SignUpView(APIView):
     permission_classes = []  # Allow any
 
