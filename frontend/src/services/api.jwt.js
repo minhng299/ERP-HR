@@ -201,8 +201,60 @@ export const hrapi = {
   getPerformances: () => api.get('/performances/'),
   createPerformance: (data) => api.post('/performances/', data),
 
-  // Payroll
-  getMySalary: () => api.get('/payroll/my-salary/'),
+  // ==========================================================================
+  // PAYROLL APIs - Quản lý lương và payslip
+  // ==========================================================================
+  
+  /**
+   * Lấy lương của chính mình
+   * CẢ MANAGER VÀ EMPLOYEE đều dùng được
+   * @param {string} month - Tháng cần xem (format: 'YYYY-MM'), optional, mặc định tháng hiện tại
+   * @returns {Promise} Response chứa thông tin lương + payslip breakdown
+   */
+  getMySalary: (month) => {
+    const query = month ? `?month=${month}` : '';
+    return api.get(`/payroll/my-salary/${query}`);
+  },
+  
+  /**
+   * Lấy danh sách lương của team (chỉ manager)
+   * CHỈ MANAGER mới dùng được
+   * @param {string} month - Tháng cần xem (format: 'YYYY-MM'), optional
+   * @returns {Promise} Response chứa danh sách lương của tất cả nhân viên trong cùng phòng ban
+   */
+  getTeamSalary: (month) => {
+    const query = month ? `?month=${month}` : '';
+    return api.get(`/payroll/team-salary/${query}`);
+  },
+  
+  /**
+   * Lấy chi tiết payslip của một nhân viên cụ thể (chỉ manager)
+   * CHỈ MANAGER mới dùng được
+   * Manager chỉ xem được nhân viên trong cùng phòng ban
+   * @param {number} employeeId - ID của nhân viên cần xem payslip
+   * @param {string} month - Tháng cần xem (format: 'YYYY-MM'), optional
+   * @returns {Promise} Response chứa thông tin payslip chi tiết của nhân viên đó
+   */
+  getEmployeeSalary: (employeeId, month) => {
+    const query = month ? `?month=${month}` : '';
+    return api.get(`/payroll/employee-salary/${employeeId}/${query}`);
+  },
+  
+  /**
+   * Tải payslip dưới dạng PDF
+   * - Employee: chỉ tải được PDF của chính mình (không truyền employeeId)
+   * - Manager: có thể tải PDF của chính mình hoặc của nhân viên trong team (truyền employeeId)
+   * @param {string} month - Tháng cần tải (format: 'YYYY-MM'), optional
+   * @param {number} employeeId - ID nhân viên (chỉ manager dùng), optional
+   * @returns {Promise} Response là blob PDF file
+   */
+  getPayslipPdf: (month, employeeId) => {
+    const params = new URLSearchParams();
+    if (month) params.append('month', month);
+    if (employeeId) params.append('employee_id', employeeId);
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return api.get(`/payroll/payslip/${query}`, { responseType: 'blob' });
+  },
   setBaseSalary: (employeeId, salary) => api.post('/payroll/set-base-salary/', { employee_id: employeeId, salary }),
   getPerformances: () => api.get('/performances/'),                     
   getPerformance: (id) => api.get(`/performances/${id}/`),              

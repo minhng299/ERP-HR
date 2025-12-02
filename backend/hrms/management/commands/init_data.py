@@ -1,17 +1,29 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from hrms.models import Department, Position, Employee, LeaveType, Performance, Attendance
+from hrms.models import Department, Position, Employee, LeaveType, LeaveRequest, LeavePenalty, Performance, Attendance
 from datetime import date, time, timedelta, datetime
 import random
 import calendar
 
 class Command(BaseCommand):
-    help = 'Initialize database with sample data including enhanced attendance records'
+    help = 'Initialize database with sample data including enhanced attendance records and leave requests'
     
     def handle(self, *args, **options):
         # Delete existing attendance data to ensure clean state
+        print("Deleting old data...")
         Attendance.objects.all().delete()
-        self.stdout.write('Cleared existing attendance data')
+        LeaveRequest.objects.all().delete()
+        LeavePenalty.objects.all().delete()
+        Performance.objects.all().delete()
+        Employee.objects.all().delete()
+        Department.objects.all().delete()
+        Position.objects.all().delete()
+        LeaveType.objects.all().delete()
+        User.objects.all().delete()
+        
+        # ======================================================================
+        # PHẦN 1: TẠO DEPARTMENTS VÀ POSITIONS
+        # ======================================================================
         # Create departments
         departments = [
             {'name': 'Engineering', 'description': 'Software development and technical teams'},
@@ -38,16 +50,54 @@ class Command(BaseCommand):
             pos, _ = Position.objects.get_or_create(**pos_data)
             pos_objs.append(pos)
 
-        # Create leave types
+        # ======================================================================
+        # PHẦN 2: TẠO LEAVE TYPES VÀ LEAVE PENALTIES
+        # ======================================================================
+        # Create leave types từ init_data_leave.py
         leave_types = [
+            {
+                'name': 'Bệnh, bất khả kháng',
+                'description': 'Nghỉ bệnh hoặc lý do bất khả kháng',
+                'max_days_per_year': 15,
+                'is_paid': True
+            },
+            {
+                'name': 'Còn lại',
+                'description': 'Các loại nghỉ khác ngoài bệnh, bất khả kháng',
+                'max_days_per_year': 10,
+                'is_paid': False
+            },
+        ]
+        leave_type_objs = []
+        for leave_data in leave_types:
+            obj, created = LeaveType.objects.get_or_create(name=leave_data['name'], defaults=leave_data)
+            leave_type_objs.append(obj)
+            self.stdout.write(f"LeaveType '{leave_data['name']}' - created: {created}")
+
+        # Tạo LeavePenalty cho từng loại nghỉ
+        penalty_configs = [
+            {'name': 'Bệnh, bất khả kháng', 'percent': 0.00},
+            {'name': 'Còn lại', 'percent': 50.00},
+        ]
+        for config in penalty_configs:
+            lt = next((lt for lt in leave_type_objs if lt.name == config['name']), None)
+            if lt:
+                obj, created = LeavePenalty.objects.get_or_create(leave_type=lt, defaults={'penalty_percent': config['percent']})
+                self.stdout.write(f"LeavePenalty '{lt.name}' - {config['percent']}% - created: {created}")
+
+        # Tạo thêm các leave types từ init_data.py gốc (nếu cần)
+        additional_leave_types = [
             {'name': 'Annual Leave', 'max_days_per_year': 25, 'description': 'Yearly vacation days'},
             {'name': 'Sick Leave', 'max_days_per_year': 10, 'description': 'Medical leave'},
             {'name': 'Personal Leave', 'max_days_per_year': 5, 'description': 'Personal time off'},
             {'name': 'Maternity Leave', 'max_days_per_year': 90, 'description': 'Maternity leave'},
         ]
-        for leave_data in leave_types:
+        for leave_data in additional_leave_types:
             LeaveType.objects.get_or_create(**leave_data)
 
+        # ======================================================================
+        # PHẦN 3: TẠO USERS VÀ EMPLOYEES
+        # ======================================================================
         # Create sample users and employees
         users = [
             {'username': 'manager1', 'email': 'manager1@example.com', 'password': 'admin123', 'first_name': 'Alice', 'last_name': 'Manager'},
@@ -55,7 +105,7 @@ class Command(BaseCommand):
             {'username': 'employee2', 'email': 'employee2@example.com', 'password': 'admin123', 'first_name': 'Charlie', 'last_name': 'Employee'},
         ]
         emp_objs = []
-        # hire_date mới: 25/9/2025 cho employee1 và employee2
+        # hire_date mới: 25/11/2025 cho employee2
         for i, user_data in enumerate(users):
             user, _ = User.objects.get_or_create(username=user_data['username'], defaults={
                 'email': user_data['email'],
@@ -64,11 +114,23 @@ class Command(BaseCommand):
             })
             user.set_password(user_data['password'])
             user.save()
-            # hire_date: chỉ employee2 là 25/9/2025, còn lại giữ nguyên
+            # hire_date: chỉ employee2 là 25/11/2025, còn lại giữ nguyên
             if i == 2:
-                hire_date = date(2025, 9, 25)
+                hire_date = date(2025, 11, 25)  # Đổi từ tháng 9 sang tháng 11
             else:
                 hire_date = date(2020, 1, 1)
+            
+            # Manager1 và Employee1 phải cùng phòng ban (Engineering - dept_objs[0])
+            if i == 0:  # Manager1
+                department = dept_objs[0]  # Engineering
+                position = pos_objs[0]  # Software Engineer
+            elif i == 1:  # Employee1 - cùng phòng ban với Manager1
+                department = dept_objs[0]  # Engineering (cùng với manager1)
+                position = pos_objs[0]  # Software Engineer
+            else:  # Employee2 và các nhân viên khác
+                department = dept_objs[min(i, len(dept_objs)-1)]
+                position = pos_objs[min(i, len(pos_objs)-1)]
+            
             emp, created = Employee.objects.get_or_create(
                 user=user,
                 employee_id=f'E00{i+1}',
@@ -76,8 +138,8 @@ class Command(BaseCommand):
                 address='123 Main St',
                 date_of_birth=date(1990+i, 1, 1),
                 hire_date=hire_date,
-                department=dept_objs[min(i, len(dept_objs)-1)],
-                position=pos_objs[min(i, len(pos_objs)-1)],
+                department=department,
+                position=position,
                 salary=6000000 if i > 0 else 9000000,
                 manager=None,
                 status='active',
@@ -87,9 +149,12 @@ class Command(BaseCommand):
             emp.save()
             emp_objs.append(emp)
 
-        # Create enhanced attendance data for manager, employee1, employee2 from Sep 5 to today
-        start_date = date(2025, 9, 5)
-        end_date = date(2025, 10, 2)  # Current date
+        # ======================================================================
+        # PHẦN 4: TẠO ATTENDANCE RECORDS (THÁNG 11)
+        # ======================================================================
+        # Create enhanced attendance data for manager, employee1, employee2 from Nov 5 to today
+        start_date = date(2025, 11, 1)  # Đổi từ tháng 9 sang tháng 11
+        end_date = date(2025, 11, 30)  # Đổi từ tháng 10 sang tháng 12
         
         delta = (end_date - start_date).days + 1
         work_days = [start_date + timedelta(days=i) for i in range(delta)]
@@ -169,9 +234,9 @@ class Command(BaseCommand):
             else:
                 self.stdout.write(f"  Employee1 absent on {d}")
         
-        # Employee2 attendance: only from hire date (Sep 25), late first 3 days
+        # Employee2 attendance: only from hire date (Nov 25), late first 3 days
         self.stdout.write('Creating employee2 attendance records...')
-        emp2_start = date(2025, 9, 25)
+        emp2_start = date(2025, 11, 25)  # Đổi từ tháng 9 sang tháng 11
         emp2_days = [d for d in work_days if d >= emp2_start and d.weekday() < 5]
         
         for idx, d in enumerate(emp2_days):
@@ -285,7 +350,124 @@ class Command(BaseCommand):
             if created:
                 self.stdout.write("  Created employee2's not started attendance for today")
 
-        # Tạo thêm 5 nhân viên mới trong Engineering
+        # ======================================================================
+        # PHẦN 5: TẠO LEAVE REQUESTS (THÁNG 11)
+        # ======================================================================
+        # Tạo một số yêu cầu nghỉ phép mẫu cho các nhân viên (từ init_data_leave.py)
+        employees = Employee.objects.filter(employee_id__in=['E001', 'E002']).order_by('id')[:2]  # Manager1 và Employee1
+        sample_requests = []
+        if len(employees) >= 2:
+            # Tạo nhiều đơn cho mỗi loại, mỗi nhân viên
+            for i in range(5):
+                sample_requests.append({
+                    'employee': employees[0],  # Manager1
+                    'leave_type': leave_type_objs[0],  # Bệnh, bất khả kháng
+                    'start_date': date(2025, 11, 10+i),  # Đổi từ tháng 9 sang tháng 11
+                    'end_date': date(2025, 11, 10+i),
+                    'days_requested': 1,
+                    'reason': f'Bị ốm lần {i+1}',
+                    'status': 'approved' if i % 2 == 0 else 'pending',
+                    'approved_by': employees[1] if i % 2 == 0 else None,  # Employee1 approve
+                    'comments': 'Đã duyệt nghỉ bệnh' if i % 2 == 0 else '',
+                })
+                sample_requests.append({
+                    'employee': employees[1],  # Employee1
+                    'leave_type': leave_type_objs[1],  # Còn lại
+                    'start_date': date(2025, 11, 15+i),  # Đổi từ tháng 9 sang tháng 11
+                    'end_date': date(2025, 11, 15+i),
+                    'days_requested': 1,
+                    'reason': f'Nghỉ việc riêng lần {i+1}',
+                    'status': 'approved' if i % 2 == 1 else 'pending',
+                    'approved_by': employees[0] if i % 2 == 1 else None,  # Manager1 approve
+                    'comments': 'Đã duyệt nghỉ việc riêng' if i % 2 == 1 else '',
+                })
+        
+        for req in sample_requests:
+            if req['employee'] and req['leave_type']:
+                # Set response_date nếu đã được approve
+                from django.utils import timezone
+                response_date = timezone.now() if req['status'] == 'approved' and req['approved_by'] else None
+                
+                obj, created = LeaveRequest.objects.get_or_create(
+                    employee=req['employee'],
+                    leave_type=req['leave_type'],
+                    start_date=req['start_date'],
+                    end_date=req['end_date'],
+                    defaults={
+                        'days_requested': req['days_requested'],
+                        'reason': req['reason'],
+                        'status': req['status'],
+                        'approved_by': req['approved_by'],
+                        'response_date': response_date,
+                        'comments': req['comments'],
+                    }
+                )
+                self.stdout.write(f"LeaveRequest for {req['employee']} - created: {created}")
+
+        # ======================================================================
+        # PHẦN 6: TẠO PERFORMANCE REVIEWS
+        # ======================================================================
+        # Create sample performance review
+        if len(emp_objs) > 1:
+            Performance.objects.get_or_create(
+                employee=emp_objs[1],
+                reviewer=emp_objs[0],
+                review_period_start=date(2023, 1, 1),
+                review_period_end=date(2023, 12, 31),
+                overall_rating=5,
+                goals_achievement=4,
+                communication=5,
+                teamwork=4,
+                initiative=5,
+                comments='Excellent performance throughout the year.',
+                employee_comments='Thank you!',
+            )
+
+        # ======================================================================
+        # PHẦN 7: TẠO THÊM NHIỀU EMPLOYEES CHO CÁC PHÒNG BAN KHÁC
+        # ======================================================================
+        import random
+        extra_emp_objs = []
+        for dept in dept_objs:
+            pos = dept.position_set.first() or pos_objs[0]
+            num_users = random.randint(5, 10)
+            for i in range(num_users):
+                role = 'manager' if i < 2 else 'employee'
+                username = f"{dept.name.lower()}_{role}{i+1}"
+                email = f"{username}@example.com"
+                user = User.objects.create_user(
+                    username=username,
+                    email=email,
+                    password="admin123",
+                    first_name=dept.name,
+                    last_name=role.capitalize()
+                )
+                # Tạo lương ngẫu nhiên và làm tròn đến hàng 100,000
+                random_salary = random.randint(6000000, 15000000)
+                rounded_salary = round(random_salary / 100000) * 100000
+                
+                emp = Employee.objects.create(
+                    user=user,
+                    employee_id=f"{dept.name[:2].upper()}{i+1:03d}",
+                    phone_number=f"+1000000{i:04d}",
+                    address="456 Extra St",
+                    date_of_birth=date(1995, 1, 1),
+                    hire_date=date(2022, 1, 1),
+                    department=dept,
+                    position=pos,
+                    salary=rounded_salary,
+                    manager=None,
+                    status="active",
+                    profile_picture="",
+                    role=role
+                )
+                extra_emp_objs.append(emp)
+                print(f"Created extra {role}: {username} in {dept.name}")
+                
+        self.stdout.write(self.style.SUCCESS('Successfully populated sample data including attendance and leave requests'))
+        # ======================================================================
+        # PHẦN 8: TẠO THÊM 5 NHÂN VIÊN MỚI TRONG ENGINEERING
+        # ======================================================================
         self.stdout.write("Creating additional 5 Engineering employees...")
 
         engineering_dept = Department.objects.get(name='Engineering')
@@ -293,7 +475,7 @@ class Command(BaseCommand):
 
         extra_employees = [
             {'username': f'eng{i}', 'first_name': f'Eng{i}', 'last_name': 'Dev', 'email': f'eng{i}@example.com'}
-            for i in range(1, 6)  # Nếu eng1 đã có, nó sẽ skip bên dưới
+            for i in range(1, 6)  # Nếu eng1 đã có, sẽ skip
         ]
 
         for idx, data in enumerate(extra_employees, start=1):
@@ -337,63 +519,35 @@ class Command(BaseCommand):
 
             except Exception as e:
                 self.stdout.write(f"  Error creating employee {data['username']}: {e}")
-                continue 
-            
-            # Create sample performance review
-#         emp = emp_objs[1]  # employee
-# # Tìm reviewer cùng department và role='Manager'
-#         reviewer = Employee.objects.filter(department=emp.department, role__iexact='Manager').first()
+                continue
 
-#         if reviewer:
-#             Performance.objects.get_or_create(
-#                 employee=emp,
-#                 reviewer=reviewer,
-#                 review_period_start=date(2023, 1, 1),
-#                 review_period_end=date(2023, 12, 31),
-#                 overall_rating=5,
-#                 goals_achievement=4,
-#                 communication=5,
-#                 teamwork=4,
-#                 initiative=5,
-#                 comments='Excellent performance throughout the year.',
-#                 employee_comments='Thank you!',
-#             )
+        # ======================================================================
+        # PHẦN 9: TẠO PERFORMANCE REVIEWS CHO ENG1
+        # ======================================================================
         Performance.objects.all().delete()
         self.stdout.write("Creating sample performance reviews ONLY for eng1...")
 
-        # Lấy department + reviewer (manager)
-        engineering_dept = Department.objects.get(name="Engineering")
+        # Lấy reviewer (manager)
         reviewer = Employee.objects.filter(department=engineering_dept, role='manager').first()
-
         if not reviewer:
             raise Exception("No Manager found in Engineering department!")
 
         # Lấy employee eng1
-        emp = Employee.objects.filter(
-            department=engineering_dept,
-            user__username="eng1"
-        ).first()
-
+        emp = Employee.objects.filter(department=engineering_dept, user__username="eng1").first()
         if not emp:
             raise Exception("Employee eng1 not found!")
 
         # Danh sách status mẫu
         sample_statuses = ["draft", "submitted", "feedback", "finalized"]
-
-        # Tạo review tháng 1 → 4/2024 cho eng1
         year = 2024
-        for idx, status in enumerate(sample_statuses, start=1):
 
-            month = idx  # 1,2,3,4
+        for idx, status in enumerate(sample_statuses, start=1):
+            month = idx
             start_date = date(year, month, 1)
             end_date = date(year, month, calendar.monthrange(year, month)[1])
 
             # Check tránh tạo trùng
-            if Performance.objects.filter(
-                employee=emp,
-                reviewer=reviewer,
-                review_period_start=start_date
-            ).exists():
+            if Performance.objects.filter(employee=emp, reviewer=reviewer, review_period_start=start_date).exists():
                 continue
 
             Performance.objects.create(
