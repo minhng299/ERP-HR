@@ -235,8 +235,9 @@ const LeaveManagement = () => {
 
 
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-xl">
+        <div className="fixed inset-0 bg-gray bg-opacity-30 flex justify-center items-center z-50"
+        style={{ backdropFilter: 'blur(10px)' }}>
+          <div className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl w-full max-w-xl">
             <CreateLeaveRequest
               onSuccess={() => {
                 setShowForm(false);
