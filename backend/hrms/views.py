@@ -21,6 +21,10 @@ from .serializers import (
 )
 from rest_framework.views import APIView
 from django.contrib.auth import authenticate
+
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+
 class SignUpView(APIView):
     permission_classes = []  # Allow any
 
@@ -152,7 +156,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['employee', 'date', 'status']
     
-    def get_queryset(self):
+    def get_queryset(self): # if not manager → chỉ được xem chấm công của chính mình
+# if manager → xem tất cả
         queryset = super().get_queryset()
         
         # Filter by current user if not manager
@@ -182,6 +187,26 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def check_in(self, request):
+        # Lấy employee từ user login
+
+# Kiểm tra hôm nay employee có đang trong kỳ nghỉ được duyệt không → cấm check-in
+
+# Tạo hoặc lấy record Attendance của ngày hôm nay
+
+# Kiểm tra các trường hợp:
+
+# Nếu đã check-in → báo lỗi
+
+# Nếu đã check-out → báo lỗi
+
+# Nếu đang on_leave → lỗi
+
+# Nếu incomplete → update lại check_in
+
+# Lưu lại giờ check-in
+
+# Trả về is_late = attendance.is_late()
+
         """Real-time check-in with current timestamp"""
         try:
             employee = request.user.employee
@@ -252,7 +277,17 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         })
     
     @action(detail=False, methods=['post'])
-    def check_out(self, request):
+    def check_out(self, request): 
+        # Lấy Attendance của hôm nay
+# Kiểm tra:
+# Chưa check-in → không được checkout
+# Đang on_break → auto kết thúc break và cộng break_duration
+# Ghi giờ check-out
+# Tự tính:
+# total_hours
+# overtime
+# early_departure
+# Trả về data cho frontend.
         """Real-time check-out with calculations"""
         try:
             employee = request.user.employee
@@ -307,6 +342,10 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'])
     def start_break(self, request):
         """Start break period"""
+        # Chỉ cho phép nếu status là checked_in.
+        # Set:
+        # break_start = now
+        # status = on_break
         try:
             employee = request.user.employee
         except Employee.DoesNotExist:
@@ -337,6 +376,11 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'])
     def end_break(self, request):
+
+        # Chỉ cho phép nếu status = on_break.
+        # Tính break_duration = end - start
+        # Cộng vào tổng break_duration của ngày
+        # Trả về kết quả.
         """End break period"""
         try:
             employee = request.user.employee
@@ -378,6 +422,13 @@ class AttendanceViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def current_status(self, request):
+        # đang ở trạng thái gì (not_started / checked_in / on_break / checked_out / on_leave)
+
+        # có được phép check_in không
+
+        # có được phép check_out không
+
+        # thời gian server hiện tại
         """Get current attendance status for today"""
         try:
             employee = request.user.employee
@@ -431,7 +482,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         })
     
     @action(detail=False, methods=['get'])
-    def today(self, request):
+    def today(self, request): # manager xem toàn công ty hôm nay
         """Get today's attendance for all employees (managers only)"""
         if not hasattr(request.user, 'employee') or request.user.employee.role != 'manager':
             return Response({'error': 'Manager access required'}, 
@@ -479,6 +530,8 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         })
     
     def get_client_ip(self, request):
+        # Lấy IP client để lưu vào Attendance:
+
         """Get client IP address"""
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         if x_forwarded_for:
