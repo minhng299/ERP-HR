@@ -89,7 +89,7 @@ class Command(BaseCommand):
         # Tạo thêm các leave types từ init_data.py gốc (nếu cần)
         additional_leave_types = [
             {'name': 'Annual Leave', 'max_days_per_year': 25, 'description': 'Yearly vacation days'},
-            {'name': 'Sick Leave', 'max_days_per_year': 10, 'description': 'Medical leave'},
+            # {'name': 'Sick Leave', 'max_days_per_year': 10, 'description': 'Medical leave'},
             {'name': 'Personal Leave', 'max_days_per_year': 5, 'description': 'Personal time off'},
             {'name': 'Maternity Leave', 'max_days_per_year': 90, 'description': 'Maternity leave'},
         ]

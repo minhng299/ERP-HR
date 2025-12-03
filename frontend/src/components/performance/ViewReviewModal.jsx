@@ -13,8 +13,9 @@ const ViewReviewModal = ({ isOpen, onClose, review }) => {
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 flex items-center justify-center bg-gray bg-opacity-30 z-50"
+    style={{ backdropFilter: 'blur(10px)' }}>
+      <div className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Review Details</h2>
         <div className="space-y-2 text-gray-700">
           <p><strong>Employee:</strong> {review.employee_name}</p>

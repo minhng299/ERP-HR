@@ -459,35 +459,6 @@ class Performance(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
-# # Signal handlers for proper cleanup
-# @receiver(post_delete, sender=Employee)
-# def delete_user_on_employee_delete(sender, instance, **kwargs):
-#     """
-#     When an Employee is deleted, also delete the associated User.
-#     This ensures no orphaned User records remain.
-#     """
-#     try:
-#         if instance.user:
-#             instance.user.delete()
-#     except User.DoesNotExist:
-#         # User was already deleted, nothing to do
-#         pass
-# không cần vì use đã onebyonefield.cascade với employee
-
-
-@receiver(pre_save, sender=Employee)
-def prevent_duplicate_users(sender, instance, **kwargs):
-    """
-    Prevent creating employees with users that are already associated with other employees.
-    """
-    if instance.user:
-        # Check if this user is already associated with another employee
-        existing_employee = Employee.objects.filter(user=instance.user).exclude(pk=instance.pk).first()
-        if existing_employee:
-            raise ValidationError(f"User {instance.user.username} is already associated with employee {existing_employee.employee_id}")
-
-
-
 # Signal handlers for proper cleanup
 @receiver(post_delete, sender=Employee)
 def delete_user_on_employee_delete(sender, instance, **kwargs):
