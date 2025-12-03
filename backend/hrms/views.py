@@ -40,7 +40,8 @@ from rest_framework.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from django.http import HttpResponse
 from django.db import models
-
+from reportlab.pdfgen import canvas
+from django.db.models.functions import TruncMonth, TruncQuarter, TruncYear
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
@@ -667,3 +668,41 @@ def change_password(request):
     user.save()
     
     return Response({'message': 'Password changed successfully'}, status=status.HTTP_200_OK)
+    
+    # @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    # def analytics_by_period(self, request):
+    #     """Phân tích dữ liệu theo kỳ (tháng/quý/năm + filter cụ thể)"""
+    #     period = request.query_params.get("period", "month")
+    #     year = request.query_params.get("year")
+    #     month = request.query_params.get("month")
+    #     quarter = request.query_params.get("quarter")
+
+    #     if period == "month":
+    #         trunc = TruncMonth("review_period_start")
+    #     elif period == "quarter":
+    #         trunc = TruncQuarter("review_period_start")
+    #     elif period == "year":
+    #         trunc = TruncYear("review_period_start")
+    #     else:
+    #         return Response({"error": "Invalid period"}, status=400)
+
+    #     queryset = self.get_queryset().annotate(
+    #         period=trunc,
+    #         dept=models.F("employee__department__name")
+    #     )
+
+    #     # Filter thêm theo params
+    #     if year:
+    #         queryset = queryset.filter(review_period_start__year=year)
+    #     if month:
+    #         queryset = queryset.filter(review_period_start__month=month)
+    #     if quarter:
+    #         queryset = queryset.filter(review_period_start__quarter=quarter)
+
+    #     stats = queryset.values("period", "dept").annotate(
+    #         avg_rating=Avg("overall_rating"),
+    #         total_reviews=Count("id"),
+    #         finalized_reviews=Count("id", filter=Q(status="finalized"))
+    #     ).order_by("-period", "dept")
+
+    #     return Response(stats)

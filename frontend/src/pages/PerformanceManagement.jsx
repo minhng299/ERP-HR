@@ -7,36 +7,71 @@ import EditReviewModal from "../components/performance/EditReviewModal";
 import ViewReviewModal from "../components/performance/ViewReviewModal";
 
 const PerformanceManagement = () => {
-  const { user } = useAuth();  //lấy user.role
+  const { user } = useAuth();
   const [performances, setPerformances] = useState([]);
   const [analytics, setAnalytics] = useState({});
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedReview, setSelectedReview] = useState(null);
+  const [isAnalyticsModalOpen, setIsAnalyticsModalOpen] = useState(false);
+  const [period, setPeriod] = useState("month");
+  const [periodAnalytics, setPeriodAnalytics] = useState([]);
+  const [hideFinalized, setHideFinalized] = useState(false);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const filteredPerformances = performances
+  .filter((p) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      p.employee_name.toLowerCase().includes(q) ||
+      p.reviewer_name.toLowerCase().includes(q)
+    );
+  })
+  .filter(p => {
+    // ẩn finalized mặc định nếu không search hoặc filter riêng
+    const isSearching = searchQuery.trim() !== '';
+    const isFilteringStatus = statusFilter !== 'all';
+    if (!isSearching && !isFilteringStatus && p.status === 'finalized') {
+      return false; // hide
+    }
+    return true;
+  });
+
+  
+  const fetchPerformances = async () => {
+    try {
       let token = getToken();
       if (!token) {
         await login();
         token = getToken();
       }
+      const res = await hrapi.getPerformances();
+      setPerformances(res.data);
+      const analyticsRes = await hrapi.getPerformanceAnalytics();
+      setAnalytics(analyticsRes.data);
+    } catch (err) {
+      console.error("Failed to fetch performances:", err);
+    }
+  };
 
-      hrapi.getPerformances().then(response => setPerformances(response.data));
-      hrapi.getPerformanceAnalytics().then(response => setAnalytics(response.data));
-    };
-
-    fetchData();
+  useEffect(() => {
+    fetchPerformances();
   }, []);
 
-  const handleFilterChange = (status) => {
+  const handleFilterChange = async (status) => {
     setStatusFilter(status);
-    if (status === 'all') {
-      hrapi.getPerformances().then(response => setPerformances(response.data));
-    } else {
-      hrapi.getPerformancesByStatus(status).then(response => setPerformances(response.data));
+    try {
+      if (status === 'all') {
+        const res = await hrapi.getPerformances();
+        setPerformances(res.data);
+      } else {
+        const res = await hrapi.getPerformancesByStatus(status);
+        setPerformances(res.data);
+      }
+    } catch (err) {
+      console.error("Filter failed:", err);
     }
   };
 
@@ -51,21 +86,6 @@ const PerformanceManagement = () => {
     });
   };
 
-  const fetchPerformances = async () => {
-    try {
-      const res = await hrapi.getPerformances();
-      setPerformances(res.data);
-      const analyticsRes = await hrapi.getPerformanceAnalytics();
-      setAnalytics(analyticsRes.data);
-    } catch (err) {
-      console.error("Failed to fetch performances:", err);
-    }
-  };
-  
-  useEffect(() => {
-    fetchPerformances();
-  }, []);
-  
   const getRatingColor = (rating) => {
     if (rating >= 4) return 'text-green-600';
     if (rating >= 3) return 'text-yellow-600';
@@ -73,9 +93,14 @@ const PerformanceManagement = () => {
   };
 
   const getRatingText = (rating) => {
-    const ratings = ['', 'Poor', 'Below Average', 'Average', 'Above Average', 'Excellent'];
-    return ratings[rating] || 'N/A';
-  };
+    if (!rating) return 'N/A';
+    if (rating < 1.5) return 'Poor';
+    if (rating < 2.5) return 'Below Average';
+    if (rating < 3.5) return 'Average';
+    if (rating < 4.5) return 'Above Average';
+    return 'Excellent';
+  };  
+
 
   return (
     <div className="p-6">
@@ -92,35 +117,68 @@ const PerformanceManagement = () => {
           </button>
         )}
       </div>
-
       {/* Filters */}
-      <div className="mb-6">
-        <label className="text-gray-700 font-medium mr-4">Filter by Status:</label>
-        <select
-          value={statusFilter}
-          onChange={(e) => handleFilterChange(e.target.value)}
-          className="border border-gray-300 rounded-lg px-4 py-2"
+      <div className="mb-6 flex items-center space-x-4">
+        <div>
+          <label className="text-gray-700 font-medium mr-2">Filter by Status:</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => handleFilterChange(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2"
+          >
+            <option value="all">All</option>
+            <option value="draft">Draft</option>
+            <option value="submitted">Submitted</option>
+            <option value="feedback">Feedback</option>
+            <option value="finalized">Finalized</option>
+          </select>
+        </div>
+
+        <div>
+          <input
+            type="text"
+            placeholder="Search by employee/reviewer"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="border border-gray-300 rounded-lg px-4 py-2"
+          />
+        </div>
+{/* 
+        <div>
+        <button
+          className="bg-indigo-500 hover:bg-indigo-600 text-white px-4 py-2 rounded-lg"
+          onClick={() => {
+            fetchPeriodAnalytics();
+            setIsAnalyticsModalOpen(true);
+          }}
         >
-          <option value="all">All</option>
-          <option value="draft">Draft</option>
-          <option value="submitted">Submitted</option>
-          <option value="finalized">Finalized</option>
-        </select>
+          Analytics
+        </button>
+        </div> */}
       </div>
 
       {/* Performance Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+        {/* Ẩn nếu không cần Average Rating */}
+        {/* 
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-green-600">{analytics.avg_overall_rating || 'N/A'}</div>
+          <div className="text-2xl font-bold text-green-600">
+            {analytics.avg_overall_rating ? Number(analytics.avg_overall_rating).toFixed(2) : 'N/A'}
+          </div>
           <div className="text-sm text-gray-500">Average Rating</div>
         </div>
+        */}
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-2xl font-bold text-blue-600">{analytics.total_reviews || 0}</div>
           <div className="text-sm text-gray-500">Total Reviews</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-2xl font-bold text-yellow-600">{analytics.draft_reviews || 0}</div>
-          <div className="text-sm text-gray-500">Pending Reviews</div>
+          <div className="text-sm text-gray-500">Draft Reviews</div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="text-2xl font-bold text-orange-600">{analytics.feedback_reviews || 0}</div>
+          <div className="text-sm text-gray-500">Feedback Reviews</div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="text-2xl font-bold text-purple-600">{analytics.finalized_reviews || 0}</div>
@@ -136,12 +194,13 @@ const PerformanceManagement = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reviewer</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Period</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overall Rating</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Overall Rating</th>             
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {performances.map((performance) => (
+            {filteredPerformances.map((performance) => (
               <tr key={performance.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {performance.employee_name}
@@ -155,12 +214,23 @@ const PerformanceManagement = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
                     <span className={`text-sm font-medium ${getRatingColor(performance.overall_rating)}`}>
-                      {performance.overall_rating}/5
+                      {Number(performance.overall_rating).toFixed(2)}/5
                     </span>
                     <span className="ml-2 text-xs text-gray-500">
                       ({getRatingText(performance.overall_rating)})
                     </span>
                   </div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                      ${performance.status === "draft" ? "bg-yellow-100 text-yellow-800" :
+                        performance.status === "submitted" ? "bg-blue-100 text-blue-800" :
+                        performance.status === "feedback" ? "bg-orange-100 text-orange-800" :
+                        "bg-green-100 text-green-800"}`}
+                  >
+                    {performance.status}
+                  </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
@@ -225,7 +295,7 @@ const PerformanceManagement = () => {
         isOpen={isEditModalOpen}
         onClose={() => setIsEditModalOpen(false)}
         review={selectedReview}
-        role={user?.role}   // 👈 truyền role để modal biết ai đang sửa
+        role={user?.role}
         onUpdated={(updatedReview) => {
           fetchPerformances();
           setSelectedReview(updatedReview);
@@ -236,6 +306,14 @@ const PerformanceManagement = () => {
         onClose={() => setIsViewModalOpen(false)}
         review={selectedReview}
       />
+      {/* <AnalyticsModal
+        isOpen={isAnalyticsModalOpen}
+        onClose={() => setIsAnalyticsModalOpen(false)}
+        period={period}
+        setPeriod={setPeriod}
+        data={periodAnalytics}
+        fetchData={fetchPeriodAnalytics}
+      /> */}
     </div>
   );
 };

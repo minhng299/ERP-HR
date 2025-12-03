@@ -366,7 +366,7 @@ class Performance(models.Model):
     reviewer = models.ForeignKey('Employee', on_delete=models.CASCADE, related_name='reviewed_performances')
     review_period_start = models.DateField()
     review_period_end = models.DateField()
-    overall_rating = models.IntegerField(choices=RATING_CHOICES)
+    overall_rating = models.FloatField(null=True, blank=True)
     goals_achievement = models.IntegerField(choices=RATING_CHOICES)
     communication = models.IntegerField(choices=RATING_CHOICES)
     teamwork = models.IntegerField(choices=RATING_CHOICES)
@@ -384,9 +384,19 @@ class Performance(models.Model):
         return f"Performance Review: {self.employee.user.get_full_name()} by {self.reviewer.user.get_full_name()} ({self.review_period_start} - {self.review_period_end}) - Status: {self.status}"
 
     def clean(self):
+        import calendar
+
+        # 0. Ép kỳ review về đầu và cuối tháng
+        if self.review_period_start:
+            self.review_period_start = self.review_period_start.replace(day=1)
+        if self.review_period_end:
+            last_day = calendar.monthrange(self.review_period_end.year, self.review_period_end.month)[1]
+            self.review_period_end = self.review_period_end.replace(day=last_day)
+
         # 1. Ngày bắt đầu < ngày kết thúc
-        if self.review_period_start >= self.review_period_end:
-            raise ValidationError("Review period start date must be before the end date.")
+        if self.review_period_start and self.review_period_end:
+            if self.review_period_start >= self.review_period_end:
+                raise ValidationError("Review period start date must be before the end date.")
 
         # 2. Reviewer không được là chính employee
         if self.reviewer == self.employee:
@@ -422,30 +432,47 @@ class Performance(models.Model):
         # 6. Check status transition nếu update
         if self.pk:
             valid_transitions = {
-                'draft': ['submitted'],
-                'submitted': ['feedback', 'finalized'],  # manager có thể finalize hoặc chuyển sang feedback để employee phản hồi
-                'feedback': ['submitted'],               # manager chỉnh sửa lại sau khi employee feedback
-                'finalized': [],
+                'draft': ['draft', 'submitted'],
+                'submitted': ['submitted', 'feedback'],   
+                'feedback': ['feedback', 'finalized'],    
+                'finalized': ['finalized'], 
             }
             prev_status = Performance.objects.get(pk=self.pk).status
             new_status = self.status
             if new_status not in valid_transitions[prev_status]:
                 raise ValidationError(f"Invalid status transition from {prev_status} to {new_status}.")
 
+    def save(self, *args, **kwargs):
+        # --- Tính lại overall_rating trước khi lưu ---
+        scores = [
+            self.goals_achievement,
+            self.communication,
+            self.teamwork,
+            self.initiative,
+        ]
+        valid_scores = [s for s in scores if s]  
+        if valid_scores:
+            avg_score = sum(valid_scores) / len(valid_scores)
+            self.overall_rating = round(avg_score, 2)
 
-# Signal handlers for proper cleanup
-@receiver(post_delete, sender=Employee)
-def delete_user_on_employee_delete(sender, instance, **kwargs):
-    """
-    When an Employee is deleted, also delete the associated User.
-    This ensures no orphaned User records remain.
-    """
-    try:
-        if instance.user:
-            instance.user.delete()
-    except User.DoesNotExist:
-        # User was already deleted, nothing to do
-        pass
+        # Gọi clean() để đảm bảo logic
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+# # Signal handlers for proper cleanup
+# @receiver(post_delete, sender=Employee)
+# def delete_user_on_employee_delete(sender, instance, **kwargs):
+#     """
+#     When an Employee is deleted, also delete the associated User.
+#     This ensures no orphaned User records remain.
+#     """
+#     try:
+#         if instance.user:
+#             instance.user.delete()
+#     except User.DoesNotExist:
+#         # User was already deleted, nothing to do
+#         pass
+# không cần vì use đã onebyonefield.cascade với employee
 
 
 @receiver(pre_save, sender=Employee)
@@ -459,3 +486,32 @@ def prevent_duplicate_users(sender, instance, **kwargs):
         if existing_employee:
             raise ValidationError(f"User {instance.user.username} is already associated with employee {existing_employee.employee_id}")
 
+
+
+# Signal handlers for proper cleanup
+@receiver(post_delete, sender=Employee)
+def delete_user_on_employee_delete(sender, instance, **kwargs):
+    """
+    When an Employee is deleted, also delete the associated User.
+    This ensures no orphaned User records remain.
+    """
+    if instance.user_id:  # user_id is still present
+        try:
+            User.objects.filter(id=instance.user_id).delete()
+        except Exception:
+            pass
+
+
+@receiver(pre_save, sender=Employee)
+def prevent_duplicate_users(sender, instance, **kwargs):
+    """
+    Prevent creating employees with users that are already associated with other employees.
+    """
+    if instance.user:
+        # Check if this user is already associated with another employee
+        existing_employee = Employee.objects.filter(user=instance.user).exclude(pk=instance.pk).first()
+        if existing_employee:
+            raise ValidationError(f"User {instance.user.username} is already associated with employee {existing_employee.employee_id}")
+
+
+    
