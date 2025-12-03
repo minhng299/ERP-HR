@@ -5,22 +5,23 @@ const ViewReviewModal = ({ isOpen, onClose, review }) => {
   const formatDate = (dateStr) => {
     if (!dateStr) return "";
     const date = new Date(dateStr);
-    return date.toLocaleDateString("vi-VN", {
-      day: "2-digit",
+    return date.toLocaleDateString("en-US", {
       month: "2-digit",
+      day: "2-digit",
       year: "numeric",
     });
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+    <div className="fixed inset-0 flex items-center justify-center bg-gray bg-opacity-30 z-50"
+    style={{ backdropFilter: 'blur(10px)' }}>
+      <div className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl p-6 w-full max-w-md">
         <h2 className="text-xl font-bold mb-4">Review Details</h2>
         <div className="space-y-2 text-gray-700">
           <p><strong>Employee:</strong> {review.employee_name}</p>
           <p><strong>Reviewer:</strong> {review.reviewer_name}</p>
           <p>
-            <strong>Period (Day/Month/Year):</strong>{" "}
+            <strong>Period:</strong>{" "}
             {formatDate(review.review_period_start)} →{" "}
             {formatDate(review.review_period_end)}
           </p>

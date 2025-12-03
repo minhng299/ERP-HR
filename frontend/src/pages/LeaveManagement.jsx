@@ -211,9 +211,10 @@ const LeaveManagement = () => {
 
 
 {showDetail && selectedRequest && (
-  <div className="fixed inset-0 z-50 flex justify-center items-center pointer-events-none">
+  <div className="fixed inset-0 bg-gray bg-opacity-30 flex justify-center items-center z-50"
+        style={{ backdropFilter: 'blur(10px)' }}>
     {/* Modal chi tiết */}
-    <div className="bg-white/90 backdrop-blur-md shadow-xl rounded-lg p-6 w-full max-w-xl relative z-50 pointer-events-auto">
+    <div className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl p-6 w-full max-w-xl relative z-50 pointer-events-auto">
       <h2 className="text-xl font-bold mb-4">Leave Details</h2>
       <p><strong>Employee:</strong> {selectedRequest.employee_name}</p>
       <p><strong>Type:</strong> {selectedRequest.leave_type_name}</p>
@@ -237,7 +238,7 @@ const LeaveManagement = () => {
       {showForm && (
         <div className="fixed inset-0 bg-gray bg-opacity-30 flex justify-center items-center z-50"
         style={{ backdropFilter: 'blur(10px)' }}>
-          <div className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl w-full max-w-xl">
+          <div className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl p-6 w-full max-w-xl z-50">
             <CreateLeaveRequest
               onSuccess={() => {
                 setShowForm(false);

@@ -9,7 +9,6 @@ const NewReviewModal = ({ isOpen, onClose, onReviewCreated }) => {
     employee: "",
     review_period_start: "",
     review_period_end: "",
-    overall_rating: 3,
     goals_achievement: 3,
     communication: 3,
     teamwork: 3,
@@ -21,20 +20,20 @@ const NewReviewModal = ({ isOpen, onClose, onReviewCreated }) => {
   const [errors, setErrors] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load danh sách employee (lọc theo department nếu là manager)
   useEffect(() => {
     if (isOpen && currentUser) {
       hrapi.getEmployees().then((response) => {
         let filteredEmployees = response.data;
-
-        if (currentUser.role?.toLowerCase() === "manager" && currentUser.department) {
+        if (
+          currentUser.role?.toLowerCase() === "manager" &&
+          currentUser.department
+        ) {
           filteredEmployees = filteredEmployees.filter(
             (emp) =>
               emp.department === currentUser.department &&
               emp.role?.toLowerCase() === "employee"
           );
         }
-
         setEmployees(filteredEmployees);
       });
     }
@@ -55,155 +54,152 @@ const NewReviewModal = ({ isOpen, onClose, onReviewCreated }) => {
     try {
       await hrapi.createPerformance({
         ...formData,
-        reviewer: currentUser.id, // backend sẽ nhận reviewer là manager hiện tại
+        reviewer: currentUser.id,
       });
       if (onReviewCreated) onReviewCreated();
       onClose();
     } catch (error) {
-      if (error.response && error.response.data) {
-        setErrors(error.response.data);
-      } else {
-        setErrors({ detail: "Unexpected error occurred." });
-      }
+      setErrors(error.response?.data || { detail: "Unexpected error occurred." });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const renderRatingField = (label, name, value) => (
+    <div className="flex-1">
+      <label className="block text-sm font-medium text-gray-700 mb-1">
+        {label}
+      </label>
+      <select
+        name={name}
+        value={value}
+        onChange={handleChange}
+        className="w-full border rounded px-3 py-2"
+        required
+      >
+        <option value={1}>1 - Poor</option>
+        <option value={2}>2 - Below Average</option>
+        <option value={3}>3 - Average</option>
+        <option value={4}>4 - Above Average</option>
+        <option value={5}>5 - Excellent</option>
+      </select>
+    </div>
+  );
+
+  const formatErrorMsg = (msg) => {
+    if (!msg) return "";
+    let text = typeof msg === "string" ? msg : String(msg);
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+  
+  const formatFieldName = (field) => {
+    if (!field || field === "non_field_errors") return "";
+    return field.charAt(0).toUpperCase() + field.slice(1);
+  };
+  
   return (
-    <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-40 z-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+    <div className="fixed inset-0 flex items-center justify-center bg-gray bg-opacity-30 z-50"
+    style={{ backdropFilter: 'blur(10px)' }}>
+      <div className="bg-white rounded-lg shadow-2xl ring-1 ring-black/10 drop-shadow-2xl p-6 w-full max-w-2xl">
         <h2 className="text-xl font-bold mb-4">New Performance Review</h2>
+
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Employee Selection */}
-          <select
-            name="employee"
-            value={formData.employee}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-            required
-          >
-            <option value="">Select Employee</option>
-            {employees.map((employee) => (
-              <option key={employee.id} value={employee.id}>
-                {employee.user?.first_name} {employee.user?.last_name}
-              </option>
-            ))}
-          </select>
-
-          {/* Reviewer (readonly) */}
-          <input
-            type="text"
-            value={`${currentUser?.user?.first_name || ""} ${currentUser?.user?.last_name || ""}`}
-            className="w-full border rounded px-3 py-2 bg-gray-100"
-            readOnly
-          />
-
-          {/* Review Period */}
-          <div className="flex space-x-2">
-            <input
-              type="date"
-              name="review_period_start"
-              value={formData.review_period_start}
+          {/* Employee */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Employee
+            </label>
+            <select
+              name="employee"
+              value={formData.employee}
               onChange={handleChange}
-              className="flex-1 border rounded px-3 py-2"
+              className="w-full border rounded px-3 py-2"
               required
-            />
+            >
+              <option value="">-- Select Employee --</option>
+              {employees.map((employee) => (
+                <option key={employee.id} value={employee.id}>
+                  {employee.user?.first_name} {employee.user?.last_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Reviewer */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reviewer
+            </label>
             <input
-              type="date"
-              name="review_period_end"
-              value={formData.review_period_end}
-              onChange={handleChange}
-              className="flex-1 border rounded px-3 py-2"
-              required
+              type="text"
+              value={`${currentUser?.user?.first_name || ""} ${
+                currentUser?.user?.last_name || ""
+              }`}
+              className="w-full border rounded px-3 py-2 bg-gray-100"
+              readOnly
             />
           </div>
 
-          {/* Overall Rating */}
-          <select
-            name="overall_rating"
-            value={formData.overall_rating}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value={1}>1 - Poor</option>
-            <option value={2}>2 - Below Average</option>
-            <option value={3}>3 - Average</option>
-            <option value={4}>4 - Above Average</option>
-            <option value={5}>5 - Excellent</option>
-          </select>
+          {/* Review Period (From - To) */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Review Period
+            </label>
+            <div className="flex space-x-2">
+              <div className="flex-1">
+                <span className="text-xs text-gray-500">From</span>
+                <input
+                  type="date"
+                  name="review_period_start"
+                  value={formData.review_period_start}
+                  onChange={handleChange}
+                  className="w-full border rounded px-3 py-2"
+                  required
+                />
+              </div>
+              <div className="flex-1">
+                <span className="text-xs text-gray-500">To</span>
+                <input
+                  type="date"
+                  name="review_period_end"
+                  value={formData.review_period_end}
+                  onChange={handleChange}
+                  className="w-full border rounded px-3 py-2"
+                  required
+                />
+              </div>
+            </div>
+          </div>
 
-          {/* Goals Achievement */}
-          <select
-            name="goals_achievement"
-            value={formData.goals_achievement}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value={1}>1 - Poor</option>
-            <option value={2}>2 - Below Average</option>
-            <option value={3}>3 - Average</option>
-            <option value={4}>4 - Above Average</option>
-            <option value={5}>5 - Excellent</option>
-          </select>
-
-          {/* Communication */}
-          <select
-            name="communication"
-            value={formData.communication}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value={1}>1 - Poor</option>
-            <option value={2}>2 - Below Average</option>
-            <option value={3}>3 - Average</option>
-            <option value={4}>4 - Above Average</option>
-            <option value={5}>5 - Excellent</option>
-          </select>
-
-          {/* Teamwork */}
-          <select
-            name="teamwork"
-            value={formData.teamwork}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value={1}>1 - Poor</option>
-            <option value={2}>2 - Below Average</option>
-            <option value={3}>3 - Average</option>
-            <option value={4}>4 - Above Average</option>
-            <option value={5}>5 - Excellent</option>
-          </select>
-
-          {/* Initiative */}
-          <select
-            name="initiative"
-            value={formData.initiative}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          >
-            <option value={1}>1 - Poor</option>
-            <option value={2}>2 - Below Average</option>
-            <option value={3}>3 - Average</option>
-            <option value={4}>4 - Above Average</option>
-            <option value={5}>5 - Excellent</option>
-          </select>
+          {/* Ratings: 2 columns x 2 rows */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {renderRatingField("Goals Achievement", "goals_achievement", formData.goals_achievement)}
+            {renderRatingField("Communication", "communication", formData.communication)}
+            {renderRatingField("Teamwork", "teamwork", formData.teamwork)}
+            {renderRatingField("Initiative", "initiative", formData.initiative)}
+          </div>
 
           {/* Comments */}
-          <textarea
-            name="comments"
-            placeholder="Comments"
-            value={formData.comments}
-            onChange={handleChange}
-            className="w-full border rounded px-3 py-2"
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Manager Comments
+            </label>
+            <textarea
+              name="comments"
+              placeholder="Write comments here..."
+              value={formData.comments}
+              onChange={handleChange}
+              className="w-full border rounded px-3 py-2"
+            />
+          </div>
 
-          {/* Error messages */}
+          {/* Errors */}
           {errors && (
-            <div className="bg-red-100 text-red-700 p-2 rounded">
+            <div className="bg-red-100 text-red-700 p-2 rounded text-sm">
               {Object.entries(errors).map(([field, msg]) => (
                 <p key={field}>
-                  <strong>{field}:</strong> {Array.isArray(msg) ? msg.join(", ") : msg}
+                  <strong>{formatFieldName(field)}{field !== "non_field_errors" ? ": " : ""}</strong>
+                  {Array.isArray(msg) ? msg.map(formatErrorMsg).join(", ") : formatErrorMsg(msg)}
                 </p>
               ))}
             </div>
