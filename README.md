@@ -2,7 +2,7 @@
 
 Production-ready HR management system with Django REST Framework backend and React frontend.
 
-## 🚀 Quick Setup
+## Quick Setup
 
 ### Prerequisites
 - Python 3.11+
@@ -54,19 +54,25 @@ DB_PASSWORD=your-password
 DB_HOST=localhost
 ```
 
-## ✨ Features
+## Features
 
 - **Employee Management**: CRUD operations, role-based access, bulk actions
+<img width="1919" height="915" alt="image" src="https://github.com/user-attachments/assets/bf9a58d2-4ca3-4876-bf1f-817fb4b1ae67" />
+
 - **Attendance System**: Real-time check-in/out, overtime tracking, GMT+7 timezone
+<img width="1917" height="916" alt="image" src="https://github.com/user-attachments/assets/33c31b59-2843-4a7a-8940-7f94876fea89" />
+
 - **Leave Management**: Request workflow, automatic attendance integration
+
 - **Payroll Integration**: Attendance-based salary calculations with penalties/bonuses
 - **Performance Reviews**: Manager-only reviews with complex validation
 - **Security**: JWT authentication, role permissions, data integrity
 
-## 🏗️ Tech Stack
+## Tech Stack
 
 - **Backend**: Django 5.2.6 + DRF + MySQL + JWT
 - **Frontend**: React 19 + Vite + TailwindCSS
 - **Authentication**: JWT with 12h access + 7d refresh tokens
 
 - **Timezone**: GMT+7 (Asia/Ho_Chi_Minh) consistency
+
